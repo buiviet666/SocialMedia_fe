@@ -11,28 +11,6 @@ const authApi = {
     sendForgotPasswordEmailApi: (data: GenericObject) => axiosClient.post("/auth/send-forgot-password", data),
     verifyForgotPasswordEmailApi: (data: GenericObject) => axiosClient.post("/auth/reset-password", data),
     changePasswordApi: (data: GenericObject) => axiosClient.post("/users/change-password", data),
-
-//     getAll: (): Promise<Post[]> => axiosClient.get("/posts"),
-//     getById: (id: string): Promise<Post> => axiosClient.get(`/posts/${id}`),
-//     create: (data: Partial<Post>): Promise<Post> => axiosClient.post("/posts", data),
-//     update: (id: string, data: Partial<Post>): Promise<Post> => axiosClient.put(`/posts/${id}`, data),
-//     delete: (id: string): Promise<void> => axiosClient.delete(`/posts/${id}`),
-
-//   useEffect(() => {
-//     const fetchPosts = async () => {
-//       setLoading(true);
-//       try {
-//         const res = await postApi.getAll();
-//         setPosts(res);
-//       } catch (err) {
-//         console.error("Lỗi khi lấy bài viết:", err);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-
-//     fetchPosts();
-//   }, []);
 }
 
 export default authApi;
