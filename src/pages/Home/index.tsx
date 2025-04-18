@@ -49,15 +49,6 @@ export default function Home() {
     { name: "6", text: "text6" },
   ]);
 
-  // const data = [
-  //   {name: '1', img: 'img1'},
-  //   {name: '2', img: 'img2'},
-  //   {name: '3', img: 'img3'},
-  //   {name: '4', img: 'img4'},
-  //   {name: '5', img: 'img5'},
-  //   {name: '6', img: 'img6'},
-  // ];
-
   const loadMoreData = () => {
     const newItems = Array.from({ length: 15 }, (_, index) => ({
       name: `${data.length + index + 1}`,

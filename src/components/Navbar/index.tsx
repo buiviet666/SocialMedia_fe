@@ -22,6 +22,7 @@ import { useDispatch } from "react-redux";
 import authApi from "../../apis/api/authApi";
 import { logout as logoutAction } from "../../store/authSlice";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../../constants";
+import { GrFormPreviousLink } from "react-icons/gr";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -31,6 +32,9 @@ const Navbar = () => {
   }>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [childrenComponent, setChildrenComponent] = useState(null);
+  const [hasCreatePostData, setHasCreatePostData] = useState(false);
+  const [showCreatePostConfirm, setShowCreatePostConfirm] = useState(false);
+  const [step, setStep] = useState<"select" | "compose">("select");
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -59,7 +63,7 @@ const Navbar = () => {
 
     if (dataPath.popup) {
       setIsModalOpen(true);
-      setChildrenComponent(dataPath?.component);
+      setChildrenComponent(dataPath.component());
       return;
     }
 
@@ -138,7 +142,18 @@ const Navbar = () => {
     {
       icon: <PlusOutlined />,
       popup: true,
-      component: <CreatePost />,
+      component: () => (
+        <CreatePost
+          key={Date.now()}
+          onRequestClose={() => {
+            setIsModalOpen(false);
+            setHasCreatePostData(false);
+          }}
+          setHasData={setHasCreatePostData}
+          step={step}
+          setStep={setStep}
+        />
+      ),
       title: "Tạo bài viết mới",
     },
     { icon: <UserOutlined />, path: "/profile", component: <Profile /> },
@@ -180,24 +195,105 @@ const Navbar = () => {
       >
         {renderComponent.componentPage}
       </Drawer>
-      <Modal
-        title="Tạo bài viết mới"
+      <ModalStyled
+        width={800}
+        title={
+          <div className="custom-header-create flex flex-row">
+            {step === "compose" && (
+              <GrFormPreviousLink onClick={() => setStep("select")} />
+            )}
+            <p>Create new post</p>
+            {step === "select" && (
+              <div onClick={() => setStep("compose")}>Next</div>
+            )}
+          </div>
+        }
+        footer={null}
         open={isModalOpen}
-        onOk={() => setIsModalOpen(false)}
-        onCancel={() => setIsModalOpen(false)}
+        closeIcon={false}
+        onOk={() => {
+          setShowCreatePostConfirm(false);
+          setIsModalOpen(false);
+          setHasCreatePostData(false);
+          setChildrenComponent(null);
+        }}
+        onCancel={() => {
+          if (hasCreatePostData) {
+            setShowCreatePostConfirm(true);
+          } else {
+            setIsModalOpen(false);
+            setShowCreatePostConfirm(false);
+          }
+        }}
       >
-        {childrenComponent}
+        {childrenComponent &&
+          React.cloneElement(childrenComponent, {
+            onRequestClose: () => {
+              setIsModalOpen(false);
+              setHasCreatePostData(false);
+            },
+            setHasData: setHasCreatePostData,
+            step,
+            setStep,
+          })}
+      </ModalStyled>
+      <Modal
+        open={showCreatePostConfirm}
+        onOk={() => {
+          setShowCreatePostConfirm(false);
+          setIsModalOpen(false);
+          setHasCreatePostData(false);
+        }}
+        onCancel={() => setShowCreatePostConfirm(false)}
+        title="Xác nhận"
+        okText="Có"
+        cancelText="Không"
+      >
+        <p>Bạn có chắc muốn hủy bài viết đang tạo?</p>
       </Modal>
-      {/* <ModalPopup isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <h2>Đây là nội dung của Modal</h2>
-        <p>Bạn có thể đặt bất kỳ nội dung nào ở đây.</p>
-        <button onClick={() => setIsModalOpen(false)}>Đóng</button>
-      </ModalPopup> */}
     </StyleMainNavbarPC>
   );
 };
 
 export default Navbar;
+
+const ModalStyled = styled(Modal)`
+  .ant-modal-content {
+    position: unset;
+    padding: 0;
+  }
+
+  .ant-modal-header {
+    margin: 0;
+  }
+
+  .custom-header-create {
+    width: 100%;
+    text-align: center;
+    border-bottom: 1px solid #dbdbdb;
+    padding: 10px;
+    justify-content: space-between;
+    position: relative;
+    height: 45px;
+    align-items: center;
+  }
+
+  .ant-modal-body {
+    min-height: 700px;
+  }
+
+  .custom-header-create svg {
+    font-size: 25px;
+  }
+
+  .custom-header-create p {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    padding: 10px 0;
+  }
+`;
 
 const StyleMainNavbarPC = styled.div`
   position: fixed;
