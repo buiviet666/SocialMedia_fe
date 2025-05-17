@@ -29,7 +29,7 @@ const Register = () => {
   const _onSubmit = async (val: any) => {
     try {
       const res: any = await authApi.registerApi(val);
-      if (res?.success === true) {
+      if (res?.statusCode === 201) {
         navigate("/auth/login");
       }
     } catch (error) {

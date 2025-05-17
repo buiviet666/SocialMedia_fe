@@ -10,8 +10,8 @@ import {
   SunOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Drawer, Dropdown, MenuProps, Modal } from "antd";
-import React, { useState } from "react";
+import { Drawer, Dropdown, MenuProps, message, Modal } from "antd";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import Search from "../Search";
@@ -23,6 +23,7 @@ import authApi from "../../apis/api/authApi";
 import { logout as logoutAction } from "../../store/authSlice";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../../constants";
 import { GrFormPreviousLink } from "react-icons/gr";
+import { useForm } from "react-hook-form";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -35,9 +36,28 @@ const Navbar = () => {
   const [hasCreatePostData, setHasCreatePostData] = useState(false);
   const [showCreatePostConfirm, setShowCreatePostConfirm] = useState(false);
   const [step, setStep] = useState<"select" | "compose">("select");
+  const [images, setImages] = useState<File[]>([]);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const { control, handleSubmit } = useForm({
+    mode: "onBlur",
+    reValidateMode: "onChange",
+    delayError: 200,
+    defaultValues: {
+      content: '',
+    },
+  });
+
+  const testServer = async () => {
+    try {
+      const res: any = await authApi.testApi();
+      console.log(res);
+    } catch (error) {
+      console.log(error);
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -63,7 +83,7 @@ const Navbar = () => {
 
     if (dataPath.popup) {
       setIsModalOpen(true);
-      setChildrenComponent(dataPath.component());
+      setChildrenComponent(dataPath.component);
       return;
     }
 
@@ -72,6 +92,36 @@ const Navbar = () => {
       componentPage: dataPath?.component,
       title: dataPath?.title,
     });
+  };
+
+  const resetForm = () => {
+    setShowCreatePostConfirm(false);
+    setIsModalOpen(false);
+    setHasCreatePostData(false);
+    setStep("select");
+    setImages([]);
+  };
+
+  const _onSubmit = (val: any) => {
+    // TODO: gọi API đăng bài
+    // message.success("Đăng bài thành công!");
+    if (!val.content.trim() && images.length === 0) {
+      message.warning("Vui lòng nhập nội dung hoặc chọn ít nhất 1 ảnh");
+      return;
+    }
+
+    const dataToSubmit: any = {
+      content: val.content,
+      privacy: 'PUBLIC', // hoặc field bạn muốn
+      media: images, // là File[]
+    };
+
+    console.log("previews", dataToSubmit);
+    
+    // resetForm();
+    // setHasCreatePostData?.(false);
+    // setIsModalOpen(false);
+    // setHasCreatePostData(false);
   };
 
   const items: MenuProps["items"] = [
@@ -145,19 +195,22 @@ const Navbar = () => {
       component: () => (
         <CreatePost
           key={Date.now()}
-          onRequestClose={() => {
-            setIsModalOpen(false);
-            setHasCreatePostData(false);
-          }}
           setHasData={setHasCreatePostData}
           step={step}
           setStep={setStep}
+          images={images}
+          setImages={setImages}
+          control={control}
         />
       ),
       title: "Tạo bài viết mới",
     },
     { icon: <UserOutlined />, path: "/profile", component: <Profile /> },
   ];
+
+  useEffect(() => {
+    testServer();
+  }, []);
 
   return (
     <StyleMainNavbarPC>
@@ -196,60 +249,68 @@ const Navbar = () => {
         {renderComponent.componentPage}
       </Drawer>
       <ModalStyled
-        width={800}
+        className={step === "compose" ? "modal-fullwidth" : ""}
+        // width={'70%'}
+        centered
         title={
-          <div className="custom-header-create flex flex-row">
+          <div
+            className={`${
+              step === "compose" ? "justify-between" : "justify-end"
+            } custom-header-create flex flex-row`}
+          >
             {step === "compose" && (
-              <GrFormPreviousLink onClick={() => setStep("select")} />
+              <>
+                <GrFormPreviousLink onClick={() => setStep("select")} />
+                <div className="btn_post" onClick={handleSubmit(_onSubmit)}>Post</div>
+              </>
             )}
             <p>Create new post</p>
-            {step === "select" && (
-              <div onClick={() => setStep("compose")}>Next</div>
+            {images.length > 0 && step === "select" && (
+              <div className="btn_prev_post" onClick={() => setStep("compose")}>
+                Next
+              </div>
             )}
           </div>
         }
         footer={null}
         open={isModalOpen}
         closeIcon={false}
-        onOk={() => {
-          setShowCreatePostConfirm(false);
-          setIsModalOpen(false);
-          setHasCreatePostData(false);
-          setChildrenComponent(null);
-        }}
+        // onOk={() => {
+        //   setShowCreatePostConfirm(false);
+        //   setIsModalOpen(false);
+        //   setHasCreatePostData(false);
+        //   setChildrenComponent(null);
+        // }}
         onCancel={() => {
           if (hasCreatePostData) {
             setShowCreatePostConfirm(true);
           } else {
             setIsModalOpen(false);
             setShowCreatePostConfirm(false);
+            setStep("select");
+            setImages([]);
           }
         }}
       >
         {childrenComponent &&
           React.cloneElement(childrenComponent, {
-            onRequestClose: () => {
-              setIsModalOpen(false);
-              setHasCreatePostData(false);
-            },
             setHasData: setHasCreatePostData,
             step,
             setStep,
+            setImages,
+            images,
+            control
           })}
       </ModalStyled>
       <Modal
         open={showCreatePostConfirm}
-        onOk={() => {
-          setShowCreatePostConfirm(false);
-          setIsModalOpen(false);
-          setHasCreatePostData(false);
-        }}
+        onOk={resetForm}
         onCancel={() => setShowCreatePostConfirm(false)}
-        title="Xác nhận"
-        okText="Có"
-        cancelText="Không"
+        title="Discard"
+        okText="Ok"
+        cancelText="Cancel"
       >
-        <p>Bạn có chắc muốn hủy bài viết đang tạo?</p>
+        <p>If you leave, you will lose your edits?</p>
       </Modal>
     </StyleMainNavbarPC>
   );
@@ -258,9 +319,17 @@ const Navbar = () => {
 export default Navbar;
 
 const ModalStyled = styled(Modal)`
+  min-width: 800px;
+  max-width: 80%;
+
+  &.modal-fullwidth {
+    width: 55% !important;
+  }
+
   .ant-modal-content {
     position: unset;
     padding: 0;
+    overflow: hidden;
   }
 
   .ant-modal-header {
@@ -272,18 +341,40 @@ const ModalStyled = styled(Modal)`
     text-align: center;
     border-bottom: 1px solid #dbdbdb;
     padding: 10px;
-    justify-content: space-between;
+    /* justify-content: end; */
+    /* cursor: pointer; */
     position: relative;
     height: 45px;
     align-items: center;
   }
 
   .ant-modal-body {
-    min-height: 700px;
+    min-height: 400px;
+    position: relative;
+  }
+
+  .ant-upload {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    position: absolute;
+  }
+
+  .ant-upload .icon-custom-images {
+    font-size: 100px;
+    justify-items: center;
   }
 
   .custom-header-create svg {
     font-size: 25px;
+    cursor: pointer;
+  }
+
+  .custom-header-create .btn_prev_post {
+    cursor: pointer;
+  }
+
+  .custom-header-create .btn_post {
   }
 
   .custom-header-create p {

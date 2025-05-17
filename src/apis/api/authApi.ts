@@ -3,6 +3,7 @@ import axiosClient from "../axiosClient";
 type GenericObject = Partial<Record<string, unknown>>;
 
 const authApi = {
+    testApi: () => axiosClient.get("/"),
     loginApi: (data: GenericObject) => axiosClient.post("/auth/login", data),
     registerApi: (data: GenericObject) => axiosClient.post("/auth/register", data),
     logoutApi: (data: GenericObject) => axiosClient.post("/auth/logout", data),
