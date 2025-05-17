@@ -3,7 +3,7 @@ import axios, {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from "axios";
-import { ACCESS_TOKEN } from "../constants";
+import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_BASE_API,
@@ -13,73 +13,54 @@ const axiosClient = axios.create({
   },
 });
 
-axiosClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem(ACCESS_TOKEN);
-  if (token && config.headers) {
-    config.headers["Authorization"] = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Auto refresh accessToken nếu hết hạn (401)
-let isRefreshing = false;
-let failedQueue: any[] = [];
-
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
+axiosClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = localStorage.getItem(ACCESS_TOKEN);
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-  });
-
-  failedQueue = [];
-};
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 axiosClient.interceptors.response.use(
   (response: AxiosResponse) => response.data,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const isUnauthorized = error.response?.status === 401;
+    const isNotRetrying = !originalRequest._retry;
+    const isNotRefreshEndpoint = !originalRequest.url?.includes("/auth/resetAccessToken");
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (isUnauthorized && isNotRetrying && isNotRefreshEndpoint) {
       originalRequest._retry = true;
 
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({
-            resolve: (token: string) => {
-              if (originalRequest.headers)
-                originalRequest.headers["Authorization"] = `Bearer ${token}`;
-              resolve(axiosClient(originalRequest));
-            },
-            reject: (err: any) => reject(err),
-          });
-        });
-      }
-
-      isRefreshing = true;
-
       try {
-        const res = await axiosClient.post("/auth/refresh"); // 👈 cookie đã chứa refreshToken
-        const newAccessToken = res.data?.accessToken;
+        const refreshToken = localStorage.getItem(REFRESH_TOKEN);
 
-        if (newAccessToken) {
-          localStorage.setItem(ACCESS_TOKEN, newAccessToken);
-          processQueue(null, newAccessToken);
+        if (!refreshToken) throw new Error('No refresh token');
 
-          // Gắn token mới cho request cũ
-          if (originalRequest.headers)
-            originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
-          return axiosClient(originalRequest);
+        // Gọi API refresh để lấy accessToken mới
+        const res = await axios.post(`${import.meta.env.VITE_BASE_API}/auth/resetAccessToken`, {
+          refreshToken,
+        });
+
+        const { accessToken, refreshToken: newRefreshToken } = res.data.data;
+        localStorage.setItem(ACCESS_TOKEN, accessToken);
+        localStorage.setItem(REFRESH_TOKEN, newRefreshToken);
+
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         }
-      } catch (refreshError) {
-        processQueue(refreshError, null);
+
+        // Gửi lại request cũ với token mới
+        return axiosClient(originalRequest);
+      } catch (err) {
+        // Nếu refreshToken cũng hết hạn → logout
         localStorage.removeItem(ACCESS_TOKEN);
-        window.location.href = "/login"; // hoặc dispatch logout
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
+        localStorage.removeItem(REFRESH_TOKEN);
+        window.location.href = "/login";
+        return Promise.reject(err);
       }
     }
 
