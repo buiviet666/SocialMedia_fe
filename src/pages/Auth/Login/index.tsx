@@ -1,6 +1,5 @@
-import { useDispatch, useSelector } from "react-redux";
-import { Navigate, useNavigate } from "react-router-dom";
-import { RootState } from "../../../store";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useNavigate } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import styled from "styled-components";
 import { Button, Divider, Input, Switch } from "antd";
@@ -8,58 +7,62 @@ import imgbg from "../../../assets/images/Rectangle 2756.png";
 import logo from "../../../assets/images/logoMain.png";
 import authApi from "../../../apis/api/authApi";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../../../constants";
-import { useState } from "react";
-import { login } from "../../../store/authSlice";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import { ValidateMessage } from "../../../utils/validateMessage";
+
+interface LoginFormValues {
+  identifier: string;
+  password: string;
+  rememberLogin: boolean;
+}
 
 const Login = () => {
-  const user = useSelector((state: RootState) => state.auth.user);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const [dataUser, setDataUser] = useState(null);
 
-  if (user) {
-    return <Navigate to="/" replace />;
-  }
-  console.log(dataUser);
-
-  const { control, handleSubmit } = useForm({
+  const { control, handleSubmit } = useForm<LoginFormValues>({
     mode: "onBlur",
     reValidateMode: "onChange",
     delayError: 200,
     defaultValues: {
       identifier: "",
       password: "",
+      rememberLogin: false
     },
   });
 
+  useEffect(() => {
+    const token = localStorage.getItem(ACCESS_TOKEN) || sessionStorage.getItem(ACCESS_TOKEN);
+    if (token) {
+      navigate("/", { replace: true });
+    }
+  }, []);
+
   const _onSubmit = async (val: any) => {
+    setLoading(true);
     try {
       const res: any = await authApi.loginApi(val);
-      localStorage.setItem(ACCESS_TOKEN, res?.data?.accessToken);
-      localStorage.setItem(REFRESH_TOKEN, res?.data?.refreshToken);
-      setDataUser(res?.data);
-      dispatch(
-        login({
-          id: res.data.user.id,
-          name: res.data.user.userName,
-        })
-      );
-      navigate("/");
-    } catch (error) {
-      console.log(error);
-    }
-    // if (onSubmit) {
-    //     const emitVal = {
-    //         ...val,
-    //     };
-    //     onSubmit(emitVal);
-    //     setBlock(false);
-    // }
-    console.log(val);
-  };
+      if (res?.statusCode === 200) {
+        const { accessToken, refreshToken } = res.data;
+        if (val.rememberLogin) {
+          localStorage.setItem(ACCESS_TOKEN, accessToken);
+          localStorage.setItem(REFRESH_TOKEN, refreshToken);
+        } else {
+          sessionStorage.setItem(ACCESS_TOKEN, accessToken);
+          sessionStorage.setItem(REFRESH_TOKEN, refreshToken);
+        }
 
-  const onChange = (checked: boolean) => {
-    console.log(`switch to ${checked}`);
+        navigate("/");
+        toast.success("Login successful!");
+      } else {
+        toast.error(res?.message || "Login failed");
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Please check again");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,10 +80,7 @@ const Login = () => {
                 control={control}
                 name="identifier"
                 rules={{
-                  required: {
-                    value: true,
-                    message: "validation.required",
-                  },
+                  required: "Username or Email is required",
                 }}
                 render={({ field, fieldState }) => (
                   <FormItem>
@@ -88,18 +88,14 @@ const Login = () => {
                       User name & Email
                     </label>
                     <Input
-                      className="custom_input_username"
-                      id="identifier"
-                      maxLength={255}
                       {...field}
-                      onBlur={() => field.onChange((field.value || "").trim())}
+                      id="identifier"
+                      className="custom_input_username"
+                      maxLength={255}
                       status={fieldState.invalid ? "error" : ""}
                       placeholder="Enter Username or Email"
                     />
-                    {/* <ValidateMessage
-                    message={fieldState.error?.message}
-                    params={{ field: "Mã dịch vụ" }}
-                  /> */}
+                      <ValidateMessage message={fieldState.error?.message}/>
                   </FormItem>
                 )}
               />
@@ -107,9 +103,10 @@ const Login = () => {
                 control={control}
                 name="password"
                 rules={{
-                  required: {
-                    value: true,
-                    message: "validation.required",
+                  required: "Password is required",
+                  minLength: {
+                    value: 6,
+                    message: "Minimum 6 characters",
                   },
                 }}
                 render={({ field, fieldState }) => (
@@ -118,28 +115,30 @@ const Login = () => {
                       Password
                     </label>
                     <Input.Password
-                      className="custom_input_password"
-                      id="password"
-                      maxLength={255}
                       {...field}
-                      onBlur={() => field.onChange((field.value || "").trim())}
+                      id="password"
+                      className="custom_input_password"
+                      maxLength={255}
                       status={fieldState.invalid ? "error" : ""}
                       placeholder="Enter Password"
                     />
-                    {/* <ValidateMessage
-                    message={fieldState.error?.message}
-                    params={{ field: "Mã dịch vụ" }}
-                  /> */}
+                      <ValidateMessage message={fieldState.error?.message}/>
                   </FormItem>
                 )}
               />
-              <div className="pt-5 flex justify-between ">
-                <div className="flex flex-row items-center">
-                  <Switch onChange={onChange} />
-                  <span className="ml-1.5">Remember me</span>
-                </div>
+              <div className="flex justify-between">
+                <Controller
+                  name="rememberLogin"
+                  control={control}
+                  render={({ field }) => (
+                    <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+                      <Switch checked={field.value} onChange={field.onChange} />
+                      <span style={{ marginLeft: 8 }}>Remember me</span>
+                    </div>
+                  )}
+                />
                 <div className="text-[#007AFF] cursor-pointer hover_link">
-                  Forgot password?
+                  <span>Forgot password?</span>
                 </div>
               </div>
               <div className="py-8 justify-self-center w-full">
@@ -147,16 +146,17 @@ const Login = () => {
                   htmlType="submit"
                   className="w-full button-custom"
                   type="primary"
+                  loading={loading}
                 >
                   Sign in
                 </Button>
               </div>
               <Divider />
-              <div className="pt-8 pb-6 justify-self-center w-full">
+              {/* <div className="pt-8 pb-6 justify-self-center w-full">
                 <Button className="w-full button-custom button-custom-another">
                   sign in with google
                 </Button>
-              </div>
+              </div> */}
               <div className="whitespace-nowrap text-center">
                 Dont have an account?{" "}
                 <span
@@ -169,7 +169,6 @@ const Login = () => {
             </form>
           </div>
         </div>
-        {/* <div className="mt-auto pb-2 text-right">hello 😋</div> */}
       </div>
     </StyleLogin>
   );

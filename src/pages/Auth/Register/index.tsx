@@ -1,19 +1,34 @@
-import React from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useSelector } from "react-redux";
 import { Navigate, useNavigate } from "react-router-dom";
 import { RootState } from "../../../store";
 import { Controller, useForm } from "react-hook-form";
 import styled from "styled-components";
-import imgbg from "../../../assets/images/Rectangle 2756.png";
-import { Button, Divider, Input } from "antd";
+import imgbg2 from "../../../assets/images/wallpaper2.jpg";
+import { Button, Input } from "antd";
 import logo from "../../../assets/images/logoMain.png";
 import authApi from "../../../apis/api/authApi";
+import toast from "react-hot-toast";
+import { useState } from "react";
+import { ValidateMessage } from "../../../utils/validateMessage";
+
+interface RegisterFormValues {
+  userName: string;
+  emailAddress: string;
+  phoneNumber: string;
+  password: string;
+  confirmPassword: string;
+  agreeToTerms: boolean;
+}
 
 const Register = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [dataRegister, setDataRegister] = useState();
+console.log("dataRegister", dataRegister);
 
-  const { control, handleSubmit } = useForm({
+  const { control, handleSubmit, watch } = useForm<RegisterFormValues>({
     mode: "onBlur",
     reValidateMode: "onChange",
     delayError: 200,
@@ -22,27 +37,26 @@ const Register = () => {
       password: "",
       emailAddress: "",
       phoneNumber: "",
-      // fullName: "",
+      confirmPassword: "",
+      agreeToTerms: false,
     },
   });
 
   const _onSubmit = async (val: any) => {
+    setLoading(true);
     try {
       const res: any = await authApi.registerApi(val);
       if (res?.statusCode === 201) {
         navigate("/auth/login");
+        toast.success('Account registration successful!');
+      } else {
+        setDataRegister(res?.errorMessages);
       }
-    } catch (error) {
-      console.log(error);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Please check again");
+    } finally {
+      setLoading(false);
     }
-    // if (onSubmit) {
-    //     const emitVal = {
-    //         ...val,
-    //     };
-    //     onSubmit(emitVal);
-    //     setBlock(false);
-    // }
-    console.log(val);
   };
 
   if (user) {
@@ -51,23 +65,18 @@ const Register = () => {
 
   return (
     <StyledRegister className="flex h-screen">
-      <div className=" max-md:hidden grow-7">
-        <img src={imgbg} alt="img" className="w-full h-full" />
-      </div>
-      <div className="grow-3 px-12 pt-12 flex flex-col">
+      <div className="grow-4 p-12 flex flex-col h-screen overflow-scroll overflow-x-hidden">
         <div>
           <img className="w-[150px] md:w-[300px] mx-auto" src={logo} />
           <div className="pt-12">
-            <h2 className="text-2xl font-medium">Nice to see you again</h2>
+            <h2 className="text-2xl font-medium">Nice to meet you</h2>
             <form onSubmit={handleSubmit(_onSubmit)} className="pt-6">
               <Controller
                 control={control}
                 name="userName"
                 rules={{
-                  required: {
-                    value: true,
-                    message: "validation.required",
-                  },
+                  required: "User name is required",
+                  minLength: { value: 3, message: "Minimum 3 characters" },
                 }}
                 render={({ field, fieldState }) => (
                   <FormItem>
@@ -75,54 +84,25 @@ const Register = () => {
                       User Name
                     </label>
                     <Input
-                      className="custom_input_username"
-                      id="userName"
-                      maxLength={255}
                       {...field}
-                      onBlur={() => field.onChange((field.value || "").trim())}
+                      id="userName"
+                      className="custom_input_username"
+                      maxLength={255}
                       status={fieldState.invalid ? "error" : ""}
                       placeholder="Enter Username"
                     />
-                    {/* <ValidateMessage
-                    message={fieldState.error?.message}
-                    params={{ field: "Mã dịch vụ" }}
-                  /> */}
+                      <ValidateMessage message={fieldState.error?.message} />
                   </FormItem>
                 )}
               />
-              {/* <Controller
-                control={control}
-                name="fullName"
-                rules={{
-                  required: {
-                    value: true,
-                    message: "validation.required",
-                  },
-                }}
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <label className="required" htmlFor="fullName">
-                      Full Name
-                    </label>
-                    <Input
-                      className="custom_input_username"
-                      id="fullName"
-                      maxLength={255}
-                      {...field}
-                      onBlur={() => field.onChange((field.value || "").trim())}
-                      status={fieldState.invalid ? "error" : ""}
-                      placeholder="Enter your fullname"
-                    />
-                  </FormItem>
-                )}
-              /> */}
               <Controller
                 control={control}
                 name="emailAddress"
                 rules={{
-                  required: {
-                    value: true,
-                    message: "validation.required",
+                  required: "Email is required",
+                  pattern: {
+                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: "Invalid email format",
                   },
                 }}
                 render={({ field, fieldState }) => (
@@ -131,18 +111,14 @@ const Register = () => {
                       Email
                     </label>
                     <Input
-                      className="custom_input_username"
-                      id="emailAddress"
-                      maxLength={255}
                       {...field}
-                      onBlur={() => field.onChange((field.value || "").trim())}
+                      id="emailAddress"
+                      className="custom_input_username"
+                      maxLength={255}
                       status={fieldState.invalid ? "error" : ""}
                       placeholder="Enter your email address"
                     />
-                    {/* <ValidateMessage
-                    message={fieldState.error?.message}
-                    params={{ field: "Mã dịch vụ" }}
-                  /> */}
+                      <ValidateMessage message={fieldState.error?.message} />
                   </FormItem>
                 )}
               />
@@ -150,9 +126,10 @@ const Register = () => {
                 control={control}
                 name="phoneNumber"
                 rules={{
-                  required: {
-                    value: true,
-                    message: "validation.required",
+                  required: "Phone number is required",
+                  pattern: {
+                    value: /^[0-9]{10,11}$/,
+                    message: "Invalid phone number",
                   },
                 }}
                 render={({ field, fieldState }) => (
@@ -161,18 +138,14 @@ const Register = () => {
                       Phone Number
                     </label>
                     <Input
-                      className="custom_input_username"
-                      id="phoneNumber"
-                      maxLength={255}
                       {...field}
-                      onBlur={() => field.onChange((field.value || "").trim())}
+                      id="phoneNumber"
+                      className="custom_input_username"
+                      maxLength={255}
                       status={fieldState.invalid ? "error" : ""}
                       placeholder="Enter your phone number"
                     />
-                    {/* <ValidateMessage
-                    message={fieldState.error?.message}
-                    params={{ field: "Mã dịch vụ" }}
-                  /> */}
+                      <ValidateMessage message={fieldState.error?.message} />
                   </FormItem>
                 )}
               />
@@ -180,29 +153,76 @@ const Register = () => {
                 control={control}
                 name="password"
                 rules={{
-                  required: {
-                    value: true,
-                    message: "validation.required",
+                  required: "Password is required",
+                  minLength: {
+                    value: 6,
+                    message: "Minimum 6 characters",
                   },
                 }}
                 render={({ field, fieldState }) => (
                   <FormItem>
                     <label className="required" htmlFor="password">
-                      Create Password
+                      Password
                     </label>
                     <Input.Password
-                      className="custom_input_password"
-                      id="password"
-                      maxLength={255}
                       {...field}
-                      onBlur={() => field.onChange((field.value || "").trim())}
+                      id="password"
+                      className="custom_input_password"
+                      maxLength={255}
                       status={fieldState.invalid ? "error" : ""}
                       placeholder="Enter Password"
                     />
-                    {/* <ValidateMessage
-                    message={fieldState.error?.message}
-                    params={{ field: "Mã dịch vụ" }}
-                  /> */}
+                      <ValidateMessage message={fieldState.error?.message} />
+                  </FormItem>
+                )}
+              />
+              <Controller
+                control={control}
+                name="confirmPassword"
+                rules={{
+                  required: "Please confirm your password",
+                  validate: (value) => value === watch("password") || "Passwords do not match",
+                }}
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <label className="required" htmlFor="confirmPassword">
+                      Confirm Password
+                    </label>
+                    <Input.Password
+                      id="confirmPassword"
+                      maxLength={255}
+                      {...field}
+                      status={fieldState.invalid ? "error" : ""}
+                      placeholder="Re-enter your password"
+                    />
+                    <ValidateMessage message={fieldState.error?.message} />
+                  </FormItem>
+                )}
+              />
+              <Controller
+                name="agreeToTerms"
+                control={control}
+                rules={{
+                  validate: (value) => value || "You must agree to the terms",
+                }}
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
+                      />
+                      <span>
+                        I agree to the{" "}
+                        <a href="/terms" className="text-blue-600 underline">
+                          Terms of Service
+                        </a>
+                      </span>
+                    </label>
+                    <ValidateMessage message={fieldState.error?.message} />
                   </FormItem>
                 )}
               />
@@ -211,6 +231,7 @@ const Register = () => {
                   htmlType="submit"
                   className="w-full button-custom"
                   type="primary"
+                  loading={loading}
                 >
                   Sign up
                 </Button>
@@ -227,7 +248,9 @@ const Register = () => {
             </form>
           </div>
         </div>
-        {/* <div className="mt-auto pb-2 text-right">hello 😋</div> */}
+      </div>
+      <div className=" max-md:hidden grow-6">
+        <img src={imgbg2} alt="img" className="w-full h-full" />
       </div>
     </StyledRegister>
   );

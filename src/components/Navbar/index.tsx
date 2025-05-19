@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   AlignLeftOutlined,
   BellOutlined,
@@ -18,12 +19,11 @@ import Search from "../Search";
 import Notify from "../Notify";
 import CreatePost from "../Post/CreatePost";
 import Profile from "../../pages/Profile";
-import { useDispatch } from "react-redux";
 import authApi from "../../apis/api/authApi";
-import { logout as logoutAction } from "../../store/authSlice";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../../constants";
 import { GrFormPreviousLink } from "react-icons/gr";
 import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -38,7 +38,6 @@ const Navbar = () => {
   const [step, setStep] = useState<"select" | "compose">("select");
   const [images, setImages] = useState<File[]>([]);
 
-  const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const { control, handleSubmit } = useForm({
@@ -60,18 +59,28 @@ const Navbar = () => {
   }
 
   const handleLogout = async () => {
-    try {
-      const refreshToken = localStorage.getItem(REFRESH_TOKEN);
-      console.log(refreshToken);
+    const refreshToken =
+      localStorage.getItem(REFRESH_TOKEN) || sessionStorage.getItem(REFRESH_TOKEN);
 
-      await authApi.logoutApi({ refreshToken });
-    } catch (error) {
-      console.log(error);
+    if (!refreshToken) {
+      toast.error("Token not found, already logged out?");
+      return;
+    }
+
+    try {
+      if (refreshToken) {
+        await authApi.logoutApi({ refreshToken });
+        toast.success("Logout successful!");
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Logout error");
     } finally {
       localStorage.removeItem(ACCESS_TOKEN);
       localStorage.removeItem(REFRESH_TOKEN);
-      dispatch(logoutAction());
-      navigate("/login");
+      sessionStorage.removeItem(ACCESS_TOKEN);
+      sessionStorage.removeItem(REFRESH_TOKEN);
+      
+      navigate("/auth/login");
     }
   };
 
