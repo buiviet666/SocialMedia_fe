@@ -5,6 +5,8 @@ import MainLayout from "../layouts/Main";
 import AuthLayout from "../layouts/Auth";
 import Register from "../pages/Auth/Register";
 import ProtectedRoute from "./protectedRoute";
+import ForgotPage from "../pages/Auth/ForgotPassword/ForgotPage";
+import ResetPassword from "../pages/Auth/ForgotPassword/ResetPassword";
 
 const RoutesList = createBrowserRouter([
   {
@@ -25,6 +27,8 @@ const RoutesList = createBrowserRouter([
     children: [
       { path: "login", element: <Login /> },
       { path: "register", element: <Register /> },
+      { path: "forgot-password", element: <ForgotPage />},
+      { path: "reset-password", element: <ResetPassword />},
     ],
   },
   // {

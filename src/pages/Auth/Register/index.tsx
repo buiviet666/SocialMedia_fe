@@ -25,8 +25,7 @@ const Register = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [dataRegister, setDataRegister] = useState();
-console.log("dataRegister", dataRegister);
+  // const [dataRegister, setDataRegister] = useState();
 
   const { control, handleSubmit, watch } = useForm<RegisterFormValues>({
     mode: "onBlur",
@@ -49,8 +48,6 @@ console.log("dataRegister", dataRegister);
       if (res?.statusCode === 201) {
         navigate("/auth/login");
         toast.success('Account registration successful!');
-      } else {
-        setDataRegister(res?.errorMessages);
       }
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Please check again");
@@ -76,7 +73,7 @@ console.log("dataRegister", dataRegister);
                 name="userName"
                 rules={{
                   required: "User name is required",
-                  minLength: { value: 3, message: "Minimum 3 characters" },
+                  minLength: { value: 6, message: "Minimum 6 characters" },
                 }}
                 render={({ field, fieldState }) => (
                   <FormItem>
