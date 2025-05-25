@@ -7,7 +7,7 @@ import imgbg from "../../../assets/images/Rectangle 2756.png";
 import logo from "../../../assets/images/logoMain.png";
 import authApi from "../../../apis/api/authApi";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../../../constants";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import toast from "react-hot-toast";
 import { ValidateMessage } from "../../../utils/validateMessage";
 
@@ -31,13 +31,6 @@ const Login = () => {
       rememberLogin: false
     },
   });
-
-  useEffect(() => {
-    const token = localStorage.getItem(ACCESS_TOKEN) || sessionStorage.getItem(ACCESS_TOKEN);
-    if (token) {
-      navigate("/", { replace: true });
-    }
-  }, []);
 
   const _onSubmit = async (val: any) => {
     setLoading(true);

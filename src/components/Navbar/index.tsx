@@ -7,7 +7,6 @@ import {
   PlusOutlined,
   SearchOutlined,
   SettingOutlined,
-  StarOutlined,
   SunOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -24,6 +23,7 @@ import { ACCESS_TOKEN, REFRESH_TOKEN } from "../../constants";
 import { GrFormPreviousLink } from "react-icons/gr";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
+import logoMain from '../../../logoMain.svg';
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -40,12 +40,15 @@ const Navbar = () => {
 
   const navigate = useNavigate();
 
-  const { control, handleSubmit } = useForm({
+  const { control, handleSubmit, setValue} = useForm({
     mode: "onBlur",
     reValidateMode: "onChange",
     delayError: 200,
     defaultValues: {
       content: '',
+      title: '',
+      location: '',
+      privacy: 'PUBLIC'
     },
   });
 
@@ -109,28 +112,25 @@ const Navbar = () => {
     setHasCreatePostData(false);
     setStep("select");
     setImages([]);
+    setChildrenComponent(null);
   };
 
-  const _onSubmit = (val: any) => {
-    // TODO: gọi API đăng bài
-    // message.success("Đăng bài thành công!");
-    if (!val.content.trim() && images.length === 0) {
+  const handleCreatePost = (values: any) => {
+    if (!values.content.trim() && images.length === 0) {
       message.warning("Vui lòng nhập nội dung hoặc chọn ít nhất 1 ảnh");
       return;
     }
 
-    const dataToSubmit: any = {
-      content: val.content,
-      privacy: 'PUBLIC', // hoặc field bạn muốn
-      media: images, // là File[]
+    const dataToSubmit = {
+      content: values.content,
+      title: values.title,
+      location: values.location,
+      privacy: values.privacy,
+      media: images,
     };
 
-    console.log("previews", dataToSubmit);
-    
-    // resetForm();
-    // setHasCreatePostData?.(false);
-    // setIsModalOpen(false);
-    // setHasCreatePostData(false);
+    console.log("Submitting post:", dataToSubmit);
+    // Call API here
   };
 
   const items: MenuProps["items"] = [
@@ -152,10 +152,10 @@ const Navbar = () => {
     {
       type: "divider",
     },
-    {
-      label: "chuyển tài khoản",
-      key: "4",
-    },
+    // {
+    //   label: "chuyển tài khoản",
+    //   key: "4",
+    // },
     {
       label: "Đăng xuất",
       key: "5",
@@ -173,9 +173,9 @@ const Navbar = () => {
       case "3":
         console.log("Chuyển chế độ");
         break;
-      case "4":
-        console.log("Chuyển tài khoản");
-        break;
+      // case "4":
+      //   console.log("Chuyển tài khoản");
+      //   break;
       case "5":
         handleLogout();
         break;
@@ -206,10 +206,10 @@ const Navbar = () => {
           key={Date.now()}
           setHasData={setHasCreatePostData}
           step={step}
-          setStep={setStep}
           images={images}
           setImages={setImages}
           control={control}
+          setValue={setValue}
         />
       ),
       title: "Tạo bài viết mới",
@@ -223,8 +223,8 @@ const Navbar = () => {
 
   return (
     <StyleMainNavbarPC>
-      <div onClick={() => navigate("/")}>
-        <StarOutlined className="navbar_logo" />
+      <div style={{width: '50px'}} onClick={() => navigate("/")}>
+        <img src={logoMain} alt="log" className="navbar_logo"/>
       </div>
       <div className="navbar_items">
         <ul className="navbar_list_item">
@@ -237,6 +237,7 @@ const Navbar = () => {
           ))}
         </ul>
       </div>
+
       <Dropdown
         menu={{ items, onClick: handleClick }}
         trigger={["click"]}
@@ -247,6 +248,7 @@ const Navbar = () => {
           <AlignLeftOutlined />
         </div>
       </Dropdown>
+
       <Drawer
         title={renderComponent.title}
         placement={"left"}
@@ -257,9 +259,9 @@ const Navbar = () => {
       >
         {renderComponent.componentPage}
       </Drawer>
+
       <ModalStyled
         className={step === "compose" ? "modal-fullwidth" : ""}
-        // width={'70%'}
         centered
         title={
           <div
@@ -269,8 +271,8 @@ const Navbar = () => {
           >
             {step === "compose" && (
               <>
-                <GrFormPreviousLink onClick={() => setStep("select")} />
-                <div className="btn_post" onClick={handleSubmit(_onSubmit)}>Post</div>
+                <GrFormPreviousLink onClick={() => setStep("select")} style={{margin: '0 10px'}}/>
+                <div className="btn_prev_post" onClick={handleSubmit(handleCreatePost)}>Post</div>
               </>
             )}
             <p>Create new post</p>
@@ -284,31 +286,19 @@ const Navbar = () => {
         footer={null}
         open={isModalOpen}
         closeIcon={false}
-        // onOk={() => {
-        //   setShowCreatePostConfirm(false);
-        //   setIsModalOpen(false);
-        //   setHasCreatePostData(false);
-        //   setChildrenComponent(null);
-        // }}
         onCancel={() => {
-          if (hasCreatePostData) {
-            setShowCreatePostConfirm(true);
-          } else {
-            setIsModalOpen(false);
-            setShowCreatePostConfirm(false);
-            setStep("select");
-            setImages([]);
-          }
+          if (hasCreatePostData) setShowCreatePostConfirm(true);
+          else resetForm();
         }}
       >
         {childrenComponent &&
           React.cloneElement(childrenComponent, {
             setHasData: setHasCreatePostData,
             step,
-            setStep,
             setImages,
             images,
-            control
+            control,
+            setValue
           })}
       </ModalStyled>
       <Modal
@@ -318,6 +308,7 @@ const Navbar = () => {
         title="Discard"
         okText="Ok"
         cancelText="Cancel"
+        centered
       >
         <p>If you leave, you will lose your edits?</p>
       </Modal>
@@ -349,9 +340,7 @@ const ModalStyled = styled(Modal)`
     width: 100%;
     text-align: center;
     border-bottom: 1px solid #dbdbdb;
-    padding: 10px;
-    /* justify-content: end; */
-    /* cursor: pointer; */
+    padding: 0;
     position: relative;
     height: 45px;
     align-items: center;
@@ -362,18 +351,6 @@ const ModalStyled = styled(Modal)`
     position: relative;
   }
 
-  .ant-upload {
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    position: absolute;
-  }
-
-  .ant-upload .icon-custom-images {
-    font-size: 100px;
-    justify-items: center;
-  }
-
   .custom-header-create svg {
     font-size: 25px;
     cursor: pointer;
@@ -381,6 +358,14 @@ const ModalStyled = styled(Modal)`
 
   .custom-header-create .btn_prev_post {
     cursor: pointer;
+    height: 100%;
+    align-content: center;
+    padding: 0 10px;
+    transition: all 0.6s;
+  }
+
+  .custom-header-create .btn_prev_post:hover {
+    text-decoration: underline;
   }
 
   .custom-header-create .btn_post {
@@ -407,9 +392,9 @@ const StyleMainNavbarPC = styled.div`
   border-right: 1px solid rgb(219, 219, 219);
 
   .navbar_logo {
-    font-size: 34px;
     padding: 16px 0;
     cursor: pointer;
+    width: 100%;
   }
 
   .navbar_list_item {

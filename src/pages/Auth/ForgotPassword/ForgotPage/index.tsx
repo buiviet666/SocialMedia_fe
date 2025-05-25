@@ -9,7 +9,6 @@ import authApi from "../../../../apis/api/authApi";
 import logo from "../../../../assets/images/logoMain.png";
 import toast from "react-hot-toast";
 import imgbg2 from "../../../../assets/images/wallpaper2.jpg";
-
 interface RegisterFormValues {
   email: string;
 }

@@ -1,7 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useSelector } from "react-redux";
-import { Navigate, useNavigate } from "react-router-dom";
-import { RootState } from "../../../store";
+import { useNavigate } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import styled from "styled-components";
 import imgbg2 from "../../../assets/images/wallpaper2.jpg";
@@ -22,7 +20,6 @@ interface RegisterFormValues {
 }
 
 const Register = () => {
-  const user = useSelector((state: RootState) => state.auth.user);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   // const [dataRegister, setDataRegister] = useState();
@@ -55,10 +52,6 @@ const Register = () => {
       setLoading(false);
     }
   };
-
-  if (user) {
-    return <Navigate to="/" replace />;
-  }
 
   return (
     <StyledRegister className="flex h-screen">
