@@ -1,64 +1,135 @@
-import { UserOutlined } from '@ant-design/icons';
-import { Avatar } from 'antd';
-import * as React from 'react';
-import styled from 'styled-components';
+import React from 'react';
+import styled, { css } from 'styled-components';
+import { Avatar, Button } from 'antd';
+import { UserOutlined, UploadOutlined } from '@ant-design/icons';
 
 export interface CartUserProps {
-  dataItem?: any;
+  dataItem?: {
+    name?: string;
+    des?: string;
+    avatar?: string;
+  };
+  isFollow?: boolean;
+  onToggleFollow?: () => void;
+  onChangeAvatar?: () => void;
+  size?: 'small' | 'medium' | 'large';
 }
 
-export default function CartUser({ dataItem }: CartUserProps) {
+const avatarSizeMap = {
+  small: 40,
+  medium: 64,
+  large: 100,
+};
+
+const CartUser = ({
+  dataItem,
+  isFollow,
+  onToggleFollow,
+  onChangeAvatar,
+  size = 'medium',
+}: CartUserProps) => {
+  const avatarSize = avatarSizeMap[size];
+
   return (
-    <StyleCartUser>
+    <StyleCartUser $size={size}>
       <div className="cartuser_container">
-        <div className="cartuser_avantar">
-          <Avatar icon={<UserOutlined />} />
+        <div className="cartuser_avatar">
+          <Avatar
+            size={avatarSize}
+            icon={!dataItem?.avatar && <UserOutlined />}
+            src={dataItem?.avatar}
+          />
+          {onChangeAvatar && (
+            <Button
+              icon={<UploadOutlined />}
+              size="small"
+              onClick={onChangeAvatar}
+              className="change_avatar_btn"
+            >
+              Đổi ảnh
+            </Button>
+          )}
         </div>
         <div className="cartuser_info">
-          <span>{dataItem?.name}</span>
-          <div>{dataItem?.des}</div>
+          <span className="cartuser_name">{dataItem?.name || 'Tên người dùng'}</span>
+          <div className="cartuser_desc">{dataItem?.des || 'Mô tả ngắn'}</div>
         </div>
       </div>
-      <div className="cartuser_follow">Theo dõi</div>
+      {typeof isFollow !== 'undefined' && (
+        <div className="cartuser_follow" onClick={onToggleFollow}>
+          {isFollow ? 'Đã theo dõi' : 'Theo dõi'}
+        </div>
+      )}
     </StyleCartUser>
   );
-}
+};
 
-const StyleCartUser = styled.div`
+export default CartUser;
+
+const StyleCartUser = styled.div<{ $size: 'small' | 'medium' | 'large' }>`
   display: flex;
-  flex-direction: row;
   justify-content: space-between;
-  padding: 8px 0;
   align-items: center;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 8px;
+  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); */
+  transition: all 0.2s;
 
   .cartuser_container {
     display: flex;
-    flex-direction: row;
+    align-items: center;
   }
 
-  .cartuser_avantar {
+  .cartuser_avatar {
     margin-right: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
   }
 
-  .cartuser_info span {
-    color: #000000;
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 16px;
-  }
-
-  .cartuser_info div {
-    color: #737373;
+  .change_avatar_btn {
     font-size: 12px;
-    font-weight: 400;
-    line-height: 16px;
+    padding: 0 8px;
+    height: 24px;
+  }
+
+  .cartuser_info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cartuser_name {
+    font-weight: 600;
+    color: #333;
+    ${({ $size }) =>
+      $size === 'small'
+        ? css`font-size: 14px;`
+        : $size === 'large'
+        ? css`font-size: 20px;`
+        : css`font-size: 16px;`}
+  }
+
+  .cartuser_desc {
+    color: #888;
+    ${({ $size }) =>
+      $size === 'small'
+        ? css`font-size: 11px;`
+        : $size === 'large'
+        ? css`font-size: 15px;`
+        : css`font-size: 13px;`}
   }
 
   .cartuser_follow {
-    font-size: 12px;
-    color: #37afe1;
+    font-size: 13px;
     font-weight: 600;
-    line-height: 16px;
+    color: #1890ff;
     cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 `;

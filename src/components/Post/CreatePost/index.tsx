@@ -306,7 +306,6 @@ const CreatePost = ({
               expandIconPosition={'end'} 
               items={items} 
               defaultActiveKey={['1']} 
-              // onChange={onChange} 
               />
           </div>
         </div>
@@ -348,17 +347,7 @@ const CreateStyled = styled.div`
     cursor: pointer;
   }
 
-  /* .custom-btn-photo-delete {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  } */
-
   .create-main-slide {
-    /* width: 900px;
-    height: 900px; */
     aspect-ratio: 1 / 1;
     overflow: hidden;
     display: flex !important;
@@ -413,10 +402,6 @@ const CreateStyled = styled.div`
     border: unset;
   }
 
-  /* .custom-collapse .ant-collapse-item {
-    margin-bottom: 16px;
-  } */
-
   .custom-collapse .ant-collapse-content-box {
     padding: 0 16px;
   }
@@ -466,7 +451,6 @@ const CreateStyled = styled.div`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    /* max-width: 150px; */
   }
 
   .hover-custom {
@@ -483,7 +467,6 @@ const FormItem = styled.div`
   margin-bottom: 16px;
 
   .ant-input {
-    /* margin-top: 8px; */
     min-height: 48px;
     padding: 14px 16px;
     padding-top: 0;

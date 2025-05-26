@@ -7,6 +7,12 @@ import Register from "../pages/Auth/Register";
 import ProtectedRoute from "./protectedRoute";
 import ForgotPage from "../pages/Auth/ForgotPassword/ForgotPage";
 import ResetPassword from "../pages/Auth/ForgotPassword/ResetPassword";
+import Profile from "../pages/Profile";
+import LikedPage from "../pages/Profile/LikedPage";
+import EditPage from "../pages/Profile/EditPage";
+import SuggestFriend from "../pages/SuggestFriend";
+import PostInfo from "../pages/PostInfo";
+import InboxMessage from "../pages/InboxMessage";
 
 const RoutesList = createBrowserRouter([
   {
@@ -18,7 +24,13 @@ const RoutesList = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Home /> },
-      //   { path: "login", element: <Login /> },
+      { path: "/profile/", element: <Profile /> },
+      { path: "/profile/liked", element: <LikedPage />},
+      { path: "/profile/edit", element: <EditPage />},
+      { path: "/suggest-friend", element: <SuggestFriend />},
+      { path: "/post/:id?", element: <PostInfo />},
+      { path: "/inbox/:id?", element: <InboxMessage />},
+
     ],
   },
   {

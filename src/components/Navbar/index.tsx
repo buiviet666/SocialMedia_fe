@@ -4,6 +4,7 @@ import {
   BellOutlined,
   CrownOutlined,
   HomeOutlined,
+  MessageOutlined,
   PlusOutlined,
   SearchOutlined,
   SettingOutlined,
@@ -24,6 +25,7 @@ import { GrFormPreviousLink } from "react-icons/gr";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import logoMain from '../../../logoMain.svg';
+import Message from "../Message";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -193,6 +195,12 @@ const Navbar = () => {
       title: "Tìm kiếm",
     },
     {
+      icon: <MessageOutlined />,
+      path: "",
+      component: <Message onClose={() => setOpen(false)}/>,
+      title: "Nhắn tin",
+    },
+    {
       icon: <BellOutlined />,
       path: "",
       component: <Notify />,
@@ -229,11 +237,9 @@ const Navbar = () => {
       <div className="navbar_items">
         <ul className="navbar_list_item">
           {listItem.map((items, idx) => (
-            <>
-              <li key={idx} onClick={() => showDrawer(items)}>
-                {items.icon}
-              </li>
-            </>
+            <li key={idx} onClick={() => showDrawer(items)}>
+              {items.icon}
+            </li>
           ))}
         </ul>
       </div>
@@ -324,6 +330,11 @@ const ModalStyled = styled(Modal)`
 
   &.modal-fullwidth {
     width: 55% !important;
+  }
+
+  .modal-fullwidth .ant-modal-content {
+    width: 100% !important;
+    max-width: 800px;
   }
 
   .ant-modal-content {

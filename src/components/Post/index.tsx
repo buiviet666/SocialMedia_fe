@@ -16,6 +16,8 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { settingsCart } from "../../constants/sliderSetting";
+import { useNavigate } from "react-router-dom";
+import InfoPostPopup from "./InfoPostPopup";
 
 type Props = {
   data?: any;
@@ -28,41 +30,44 @@ const Post = ({ data }: Props) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const items: MenuProps["items"] = [
-    {
-      label: "Báo cáo",
-      key: "1",
-    },
-    {
-      type: "divider",
-    },
-    {
-      label: "Bỏ theo dõi",
-      key: "2",
-    },
-    {
-      type: "divider",
-    },
-    {
-      label: "Lưu bài viết",
-      key: "3",
-    },
-    {
-      type: "divider",
-    },
-    {
-      label: "Xem toàn bộ bài viết",
-      key: "4",
-    },
-    {
-      type: "divider",
-    },
-    {
-      label: "Hủy",
-      key: "5",
-    },
+    { label: "Báo cáo", key: "1" },
+    { type: "divider" },
+    { label: "Bỏ theo dõi", key: "2" },
+    { type: "divider" },
+    { label: "Lưu bài viết", key: "3" },
+    { type: "divider" },
+    { label: "Xem toàn bộ bài viết", key: "4" },
+    { type: "divider" },
+    { label: "Hủy", key: "5" },
   ];
+
+  const handleClick: MenuProps["onClick"] = ({ key }) => {
+    switch (key) {
+      case "1":
+        console.log("Báo cáo");
+        break;
+      case "2":
+        console.log("Bỏ theo dõi");
+        break;
+      case "3":
+        console.log("Lưu bài viết");
+        break;
+      case "4":
+        handleViewPost(data?.id);
+        break;
+      default:
+        break;
+    }
+  };
+  
+  const handleViewPost = (idPost: string) => {
+    navigate(`/post/${idPost}`)
+    console.log("idPost", idPost);
+    
+  }
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -79,15 +84,9 @@ const Post = ({ data }: Props) => {
     setCursorPosition((start + emoji).length);
     setShowEmojiPicker(false);
 
-    // Đặt lại focus và vị trí con trỏ
     setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        inputRef.current.setSelectionRange(
-          (start + emoji).length,
-          (start + emoji).length
-        );
-      }
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(newValue.length, newValue.length);
     }, 0);
   };
 
@@ -95,12 +94,12 @@ const Post = ({ data }: Props) => {
     setValueInput(e.target.value);
   };
 
-  const handleEmojiPickerToggle = () => {
-    setShowEmojiPicker(!showEmojiPicker);
-    if (inputRef.current) {
-      setCursorPosition(inputRef.current.selectionStart);
-    }
-  };
+  // const handleEmojiPickerToggle = () => {
+  //   setShowEmojiPicker(!showEmojiPicker);
+  //   if (inputRef.current) {
+  //     setCursorPosition(inputRef.current.selectionStart);
+  //   }
+  // };
 
   const deleteInput = () => {
     setValueInput("");
@@ -119,36 +118,37 @@ const Post = ({ data }: Props) => {
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    setShowEmojiPicker(false);
-  }, [data]);
+  // useEffect(() => {
+  //   setShowEmojiPicker(false);
+  // }, [data]);
 
   return (
     <StyleCartPost>
+      {/* Header */}
       <div className="cartpost_title">
         <div className="cartpost_title-content">
           <div className="cartpost_title-avantar">
-            <Avatar icon={<UserOutlined />} />
+            <Avatar
+              src={data?.avatar}
+              icon={<UserOutlined />}
+              alt={data?.name}
+            />
           </div>
           <div className="cartpost_title-container">
             <div className="cartpost_title-info">
-              name
-              <span> &#8226; time</span>
+              {data?.name || "Ẩn danh"} <span>• 1 giờ trước</span>
             </div>
-            <div className="cartpost_title-location">location</div>
+            <div className="cartpost_title-location">{data?.location || ""}</div>
           </div>
         </div>
         <div className="cartpost_title-iconmore">
           <Dropdown
-            menu={{ items }}
+            menu={{ items, onClick: handleClick }}
             trigger={["click"]}
             placement="bottomLeft"
-            className="dropdownPost"
           >
             <div className="navbar_setting">
               <EllipsisOutlined />
@@ -156,44 +156,53 @@ const Post = ({ data }: Props) => {
           </Dropdown>
         </div>
       </div>
+      
+      {/* Images */}
       <div className="cartpost_title-cartmain">
         <Slider {...settingsCart}>
-          {Array.isArray(data?.img) ? (
-            data.img.map((imgItem: any, imgIdx: any) => (
-              <h1 key={imgIdx} onClick={handleOpenModal}>
-                {imgItem}
-              </h1>
-            ))
-          ) : data?.linkimg ? (
-            <img src={data.linkimg} alt="ảnh" onClick={handleOpenModal} />
-          ) : (
-            <h1>{data?.text}</h1>
-          )}
+          {Array.isArray(data?.img) &&
+            data.img.map((url, idx) => (
+              <img
+                key={idx}
+                src={url}
+                alt={`img-${idx}`}
+                onClick={() => setIsModalOpen(true)}
+                className="w-full h-[400px] object-cover cursor-pointer"
+              />
+            ))}
         </Slider>
       </div>
+      
+      {/* Content */}
       <div className="cartpost_title-contentMain">
         <div className="cartpost_title-contenticon">
           <div className="cartpost_title-iconClick">
-            <span>
-              <HeartOutlined style={{ fontSize: "26px", padding: "7px" }} />
-            </span>
-            <span>
-              <CommentOutlined style={{ fontSize: "26px", padding: "7px" }} />
-            </span>
-            <span>
-              <SendOutlined style={{ fontSize: "26px", padding: "7px" }} />
-            </span>
+            <HeartOutlined style={{ fontSize: "26px", padding: "7px" }} />
+            <CommentOutlined style={{ fontSize: "26px", padding: "7px" }} />
+            <SendOutlined style={{ fontSize: "26px", padding: "7px" }} />
           </div>
           <div className="cartpost_title-save">
             <CrownOutlined style={{ fontSize: "26px", padding: "7px" }} />
           </div>
         </div>
-        <div className="cartpost_title-likes">lượt thích</div>
-        <div className="cartpost_title-description">
-          <span>tên</span> và tiêu đề và tiêu đề và tiêu đề và tiêu đề và tiêu
-          đề và tiêu đề và tiêu đề và tiêu đề và tiêu đề và tiêu đề
-        </div>
-        <div className="cartpost_title-moreComment">xem thêm bình luận</div>
+
+        {/* Likes */}
+        {data?.likes !== undefined && (
+          <div className="cartpost_title-likes">
+            {data.likes.toLocaleString()} lượt thích
+          </div>
+        )}
+
+        {/* Caption */}
+        {data?.caption && (
+          <div className="cartpost_title-description">
+            <span className="font-semibold">{data.name}</span> {data.caption}
+          </div>
+        )}
+
+        <div className="cartpost_title-moreComment">Xem thêm bình luận</div>
+
+        {/* Comment input */}
         <div className="cartpost_title-comment">
           <input
             ref={inputRef}
@@ -211,31 +220,39 @@ const Post = ({ data }: Props) => {
               <span className="post_commend">Đăng</span>
             </>
           )}
-          <div onClick={handleEmojiPickerToggle} style={{ cursor: "pointer" }}>
-            <SmileOutlined />
+          <div onClick={() => setShowEmojiPicker((prev) => !prev)}>
+            <SmileOutlined style={{ cursor: "pointer" }} />
           </div>
         </div>
       </div>
+
+      {/* Emoji picker */}
       {showEmojiPicker && (
         <div className="pickEmoji_container" ref={emojiPickerRef}>
           <EmojiPicker onEmojiClick={onEmojiClick} />
         </div>
       )}
-      <Modal
-        title="Tạo bài viết mới"
+
+      <InfoPostPopup
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        data={data}
+      />
+
+      {/* Modal preview */}
+      {/* <Modal
+        title="Xem ảnh"
         open={isModalOpen}
         onOk={() => setIsModalOpen(false)}
         onCancel={() => setIsModalOpen(false)}
+        footer={null}
       >
-        <h2>Đây là nội dung của Modal</h2>
-        <p>Bạn có thể đặt bất kỳ nội dung nào ở đây.</p>
-        <button onClick={() => setIsModalOpen(false)}>Đóng</button>
-      </Modal>
-      {/* <ModalPopup isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <h2>Đây là nội dung của Modal</h2>
-        <p>Bạn có thể đặt bất kỳ nội dung nào ở đây.</p>
-        <button onClick={() => setIsModalOpen(false)}>Đóng</button>
-      </ModalPopup> */}
+        <Slider {...settingsCart}>
+          {data.img?.map((url, i) => (
+            <img key={i} src={url} alt={`modal-img-${i}`} className="w-full" />
+          ))}
+        </Slider>
+      </Modal> */}
     </StyleCartPost>
   );
 };

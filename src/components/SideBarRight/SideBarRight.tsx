@@ -4,105 +4,104 @@ import Footer from "../Footer";
 import CartUser from "../CartUser";
 import { Avatar } from "antd";
 import { UserOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+import { dataSuggested } from "../../utils/mockdata";
 
-// export interface SideBarRightProps {}
+export default function SideBarRight() {
+  const navigate = useNavigate();
 
-export default function SideBarRight(props: SideBarRightProps) {
-  const dataFake = [
-    { name: "user1", img: "anh1", des: "des1" },
-    { name: "user2", img: "anh2", des: "des2" },
-    { name: "user3", img: "anh3", des: "des3" },
-    { name: "user4", img: "anh4", des: "des4" },
-    { name: "user5", img: "anh5", des: "des5" },
-    { name: "user6", img: "anh6", des: "des6" },
-  ];
   return (
     <StyleSideBarRight>
-      <div className="SideBarRight_title">
-        <div className="SideBarRight_title-content">
-          <div className="SideBarRight_title-avantar">
-            <Avatar size="large" icon={<UserOutlined />} />
-          </div>
-          <div className="SideBarRight_title-container">
-            <div className="SideBarRight_title-info">name - time</div>
-            <div className="SideBarRight_title-location">location</div>
-          </div>
+      <div className="user_profile">
+        <Avatar size="large" icon={<UserOutlined />} />
+        <div className="user_info">
+          <span className="user_name">username</span>
+          <span className="user_location">Thành viên từ 2024</span>
         </div>
-        <div className="SideBarRight_title-iconmore"></div>
       </div>
-      <div className="SideBarRight_title-list">
-        <div className="SideBarRight_title-recommend">
+
+      <div className="suggest_list">
+        <div className="suggest_header">
           <span>Gợi ý cho bạn</span>
-          <a href="#">Xem tất cả</a>
+          <button onClick={() => navigate("/suggest-friend")}>Xem tất cả</button>
         </div>
-        {dataFake.map((item, idx) => (
-          <CartUser dataItem={item} key={idx} />
-        ))}
+
+        <div className="suggest_users">
+          {dataSuggested.map((item, idx) => (
+            <CartUser dataItem={item} key={idx} isFollow size="small" />
+          ))}
+        </div>
       </div>
+
       <Footer />
     </StyleSideBarRight>
   );
 }
 
 const StyleSideBarRight = styled.div`
-  padding-left: 64px;
   margin-top: 36px;
-  width: 100%;
-  max-width: 382px;
+  padding-left: 32px;
+  max-width: 380px;
   display: flex;
   flex-direction: column;
+  gap: 24px;
 
-  .SideBarRight_title {
+  .user_profile {
     display: flex;
-    flex-direction: row;
-    justify-content: space-between;
     align-items: center;
+    gap: 12px;
     padding: 0 16px;
   }
 
-  .SideBarRight_title-content {
-    display: flex;
-    flex-direction: row;
-  }
-
-  .SideBarRight_title-list {
-    margin: 24px 16px 16px;
+  .user_info {
     display: flex;
     flex-direction: column;
   }
 
-  .SideBarRight_title-recommend {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-  }
-
-  .SideBarRight_title-avantar {
-    margin-right: 12px;
-  }
-
-  .SideBarRight_title-info {
-    font-weight: bold;
-    text-overflow: ellipsis;
-    font-size: 14px;
-  }
-
-  .SideBarRight_title-location {
-    color: #737373;
-    font-size: 14px;
-  }
-
-  .SideBarRight_title-recommend span {
-    color: #737373;
-    font-size: 14px;
+  .user_name {
     font-weight: 600;
-    line-height: 18px;
+    font-size: 14px;
+    color: #262626;
   }
 
-  .SideBarRight_title-recommend a {
-    color: #000000;
+  .user_location {
     font-size: 12px;
-    font-weight: 600;
-    line-height: 16px;
+    color: #888;
+  }
+
+  .suggest_list {
+    padding: 0 16px;
+  }
+
+  .suggest_header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+
+    span {
+      font-size: 14px;
+      color: #888;
+      font-weight: 600;
+    }
+
+    button {
+      font-size: 12px;
+      color: #1890ff;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .suggest_users {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 `;
