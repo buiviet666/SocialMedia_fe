@@ -15,7 +15,7 @@ export default function SideBarRight() {
       <div className="user_profile">
         <Avatar size="large" icon={<UserOutlined />} />
         <div className="user_info">
-          <span className="user_name">username</span>
+          <span className="user_name">Buiviet</span>
           <span className="user_location">Thành viên từ 2024</span>
         </div>
       </div>

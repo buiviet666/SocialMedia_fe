@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import EmojiPicker from "emoji-picker-react";
-import { Avatar, Dropdown, MenuProps, Modal } from "antd";
+import { Avatar, Dropdown, MenuProps, message } from "antd";
 import {
   CloseOutlined,
   CommentOutlined,
   CrownOutlined,
   EllipsisOutlined,
+  HeartFilled,
   HeartOutlined,
   SendOutlined,
   SmileOutlined,
@@ -18,10 +19,16 @@ import {
 import { settingsCart } from "../../constants/sliderSetting";
 import { useNavigate } from "react-router-dom";
 import InfoPostPopup from "./InfoPostPopup";
+import postApi from "../../apis/api/postApi";
+import SharePost from "./SharePost";
+import LikeListModal from "./LikeListModal";
+import ReportPostModal from "./ReportPostModal";
+import { Modal } from "antd";
+import EditPostModal from "./EditPostModal";
 
-type Props = {
+interface Props {
   data?: any;
-};
+}
 
 const Post = ({ data }: Props) => {
   const [valueInput, setValueInput] = useState("");
@@ -30,48 +37,92 @@ const Post = ({ data }: Props) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
+  const currentUserId = localStorage.getItem("userId");
   const navigate = useNavigate();
+  const [isLiked, setIsLiked] = useState<boolean>(false);
+  const [likesCount, setLikesCount] = useState<number>(data?.likes?.length || 0);
+  const [isLiking, setIsLiking] = useState(false);
+  const [animateLike, setAnimateLike] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
-  const items: MenuProps["items"] = [
-    { label: "Báo cáo", key: "1" },
+
+
+  const isOwnPost = currentUserId === data?.userId?._id;
+
+  const mockLikedUsers = [
+    { username: "an.nguyen", avatar: "https://i.pravatar.cc/150?img=1" },
+    { username: "bao.tran", avatar: "https://i.pravatar.cc/150?img=2" },
+    { username: "linh.le", avatar: "https://i.pravatar.cc/150?img=3" },
+  ];
+
+
+  useEffect(() => {
+    if (data?.likes && currentUserId) {
+      setIsLiked(data.likes.includes(currentUserId));
+    }
+  }, [data?.likes, currentUserId]);
+
+  useEffect(() => {
+    if (data?.saves && currentUserId) {
+      setIsSaved(data.saves.includes(currentUserId));
+    }
+  }, [data?.saves, currentUserId]);
+
+
+  const items: MenuProps["items"] = isOwnPost
+  ? [
+    { label: "Xem chi tiết", key: "view" },
     { type: "divider" },
-    { label: "Bỏ theo dõi", key: "2" },
+    { label: "Sửa bài viết", key: "edit" },
     { type: "divider" },
-    { label: "Lưu bài viết", key: "3" },
+    { label: "Xóa bài viết", key: "delete" },
     { type: "divider" },
-    { label: "Xem toàn bộ bài viết", key: "4" },
+    { label: "Hủy", key: "cancel" },
+  ]
+: [
+    { label: "Báo cáo", key: "report" },
     { type: "divider" },
-    { label: "Hủy", key: "5" },
+    { label: "Bỏ theo dõi", key: "unfollow" },
+    { type: "divider" },
+    { label: "Lưu bài viết", key: "save" },
+    { type: "divider" },
+    { label: "Xem toàn bộ bài viết", key: "view" },
+    { type: "divider" },
+    { label: "Hủy", key: "cancel" },
   ];
 
   const handleClick: MenuProps["onClick"] = ({ key }) => {
+    console.log("Click menu item:", key);
+
     switch (key) {
-      case "1":
-        console.log("Báo cáo");
+      case "report":
+        setIsReportOpen(true);
         break;
-      case "2":
+      case "unfollow":
         console.log("Bỏ theo dõi");
         break;
-      case "3":
-        console.log("Lưu bài viết");
+      case "save":
+        toggleSave();
         break;
-      case "4":
-        handleViewPost(data?.id);
+      case "view":
+        navigate(`/post/${data?._id}`);
         break;
+      case "edit":
+        setIsEditOpen(true);
+        break;
+      case "delete":
+        setIsDeleteConfirmOpen(true);
+        break;
+      case "cancel":
       default:
         break;
     }
-  };
-  
-  const handleViewPost = (idPost: string) => {
-    navigate(`/post/${idPost}`)
-    console.log("idPost", idPost);
-    
-  }
-
-  const handleOpenModal = () => {
-    setIsModalOpen(true);
-    console.log(isModalOpen);
   };
 
   const onEmojiClick = (emojiObject: any) => {
@@ -79,11 +130,9 @@ const Post = ({ data }: Props) => {
     const start = valueInput.substring(0, cursorPosition || 0);
     const end = valueInput.substring(cursorPosition || 0);
     const newValue = start + emoji + end;
-
     setValueInput(newValue);
     setCursorPosition((start + emoji).length);
     setShowEmojiPicker(false);
-
     setTimeout(() => {
       inputRef.current?.focus();
       inputRef.current?.setSelectionRange(newValue.length, newValue.length);
@@ -94,19 +143,96 @@ const Post = ({ data }: Props) => {
     setValueInput(e.target.value);
   };
 
-  // const handleEmojiPickerToggle = () => {
-  //   setShowEmojiPicker(!showEmojiPicker);
-  //   if (inputRef.current) {
-  //     setCursorPosition(inputRef.current.selectionStart);
-  //   }
-  // };
-
   const deleteInput = () => {
     setValueInput("");
     setTimeout(() => {
       inputRef.current?.focus();
     }, 0);
   };
+
+  const toggleLike = async () => {
+    if (isLiking) return;
+    setIsLiking(true);
+    try {
+      const res: any = await postApi.toggleLike({ postId: data._id });
+
+      if (res?.message === "Like") {
+        setIsLiked(true);
+        setAnimateLike(true);
+      } else if (res?.message === "unLike") {
+        setIsLiked(false);
+      }
+
+      setLikesCount(res?.totalLikes || 0);
+    } catch (err) {
+      message.error("Không thể thực hiện thích/bỏ thích.");
+      console.log("err", err);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
+  const toggleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const res: any = await postApi.toggleSave({ postId: data._id });
+
+      if (res?.message === "Save") {
+        setIsSaved(true);
+        message.success("Đã lưu bài viết.");
+      } else if (res?.message === "unSave") {
+        setIsSaved(false);
+        message.info("Đã bỏ lưu bài viết.");
+      }
+    } catch (err) {
+      message.error("Không thể lưu bài viết.");
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+
+  const handleSharePost = async (message: string) => {
+    try {
+      await postApi.sharePost({ postId: data._id, message });
+      message.success("Chia sẻ bài viết thành công!");
+    } catch (err) {
+      message.error("Không thể chia sẻ bài viết.");
+      console.error(err);
+    } finally {
+      setIsShareOpen(false);
+    }
+  };
+
+  const handleUpdatePost = async (values: any) => {
+    try {
+      await postApi.updatePost(data._id, values); // PUT API
+      message.success("Đã cập nhật bài viết.");
+      // Tùy chọn: cập nhật lại UI tại chỗ nếu cần
+    } catch (error) {
+      console.error(error);
+      message.error("Cập nhật thất bại.");
+    }
+  };
+
+
+  const handleReportPost = async (reason: string) => {
+    try {
+      await postApi.reportPost({
+        postId: data.userId._id,
+        reason,
+      });
+      message.success("Đã gửi báo cáo.");
+    } catch (err) {
+      message.error("Không thể gửi báo cáo.");
+      console.error(err);
+    } finally {
+      setIsReportOpen(false);
+    }
+  };
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -121,25 +247,21 @@ const Post = ({ data }: Props) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // useEffect(() => {
-  //   setShowEmojiPicker(false);
-  // }, [data]);
 
   return (
     <StyleCartPost>
-      {/* Header */}
       <div className="cartpost_title">
         <div className="cartpost_title-content">
           <div className="cartpost_title-avantar">
             <Avatar
-              src={data?.avatar}
+              src={data?.userId?.avatar || undefined}
               icon={<UserOutlined />}
-              alt={data?.name}
+              alt={data?.userId?.username}
             />
           </div>
           <div className="cartpost_title-container">
             <div className="cartpost_title-info">
-              {data?.name || "Ẩn danh"} <span>• 1 giờ trước</span>
+              {data?.userId?.username || "Ẩn danh"} <span>• 1 giờ trước</span>
             </div>
             <div className="cartpost_title-location">{data?.location || ""}</div>
           </div>
@@ -156,15 +278,14 @@ const Post = ({ data }: Props) => {
           </Dropdown>
         </div>
       </div>
-      
-      {/* Images */}
+
       <div className="cartpost_title-cartmain">
         <Slider {...settingsCart}>
-          {Array.isArray(data?.img) &&
-            data.img.map((url, idx) => (
+          {Array.isArray(data?.photoUrls) &&
+            data.photoUrls.map((imgObj: any, idx: number) => (
               <img
                 key={idx}
-                src={url}
+                src={imgObj.url}
                 alt={`img-${idx}`}
                 onClick={() => setIsModalOpen(true)}
                 className="w-full h-[400px] object-cover cursor-pointer"
@@ -172,37 +293,57 @@ const Post = ({ data }: Props) => {
             ))}
         </Slider>
       </div>
-      
-      {/* Content */}
+
       <div className="cartpost_title-contentMain">
         <div className="cartpost_title-contenticon">
           <div className="cartpost_title-iconClick">
-            <HeartOutlined style={{ fontSize: "26px", padding: "7px" }} />
+            {isLiked && (
+              <HeartFilled
+                onClick={toggleLike}
+                className={animateLike ? "like-animation" : ""}
+                style={{ fontSize: "26px", padding: "7px", color: "#ff4d4f" }}
+              />
+            )}
+
+            {!isLiked && (
+              <HeartOutlined
+                onClick={toggleLike}
+                style={{ fontSize: "26px", padding: "7px" }}
+              />
+            )}
             <CommentOutlined style={{ fontSize: "26px", padding: "7px" }} />
-            <SendOutlined style={{ fontSize: "26px", padding: "7px" }} />
+            <SendOutlined style={{ fontSize: "26px", padding: "7px" }} onClick={() => setIsShareOpen(true)}/>
           </div>
           <div className="cartpost_title-save">
-            <CrownOutlined style={{ fontSize: "26px", padding: "7px" }} />
+            <CrownOutlined
+              onClick={toggleSave}
+              style={{
+                fontSize: "26px",
+                padding: "7px",
+                color: isSaved ? "#fadb14" : undefined,
+                cursor: "pointer",
+              }}
+            />
           </div>
         </div>
 
-        {/* Likes */}
-        {data?.likes !== undefined && (
-          <div className="cartpost_title-likes">
-            {data.likes.toLocaleString()} lượt thích
-          </div>
-        )}
+        <div
+          className="cartpost_title-likes"
+          onClick={() => setIsLikeModalOpen(true)}
+          style={{ cursor: "pointer" }}
+        >
+          {likesCount} lượt thích
+        </div>
 
-        {/* Caption */}
-        {data?.caption && (
+
+        {data?.content && (
           <div className="cartpost_title-description">
-            <span className="font-semibold">{data.name}</span> {data.caption}
+            <span className="font-semibold">{data?.userId?.username}</span> {data.content}
           </div>
         )}
 
         <div className="cartpost_title-moreComment">Xem thêm bình luận</div>
 
-        {/* Comment input */}
         <div className="cartpost_title-comment">
           <input
             ref={inputRef}
@@ -226,7 +367,6 @@ const Post = ({ data }: Props) => {
         </div>
       </div>
 
-      {/* Emoji picker */}
       {showEmojiPicker && (
         <div className="pickEmoji_container" ref={emojiPickerRef}>
           <EmojiPicker onEmojiClick={onEmojiClick} />
@@ -239,25 +379,99 @@ const Post = ({ data }: Props) => {
         data={data}
       />
 
-      {/* Modal preview */}
-      {/* <Modal
-        title="Xem ảnh"
-        open={isModalOpen}
-        onOk={() => setIsModalOpen(false)}
-        onCancel={() => setIsModalOpen(false)}
+      <SharePost
+        open={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        onSubmit={handleSharePost}
+      />
+
+      <LikeListModal
+        open={isLikeModalOpen}
+        onClose={() => setIsLikeModalOpen(false)}
+        data={mockLikedUsers}
+      />
+
+      <ReportPostModal
+        open={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        onSubmit={handleReportPost}
+      />
+
+      <Modal
+        open={isDeleteConfirmOpen}
+        onCancel={() => setIsDeleteConfirmOpen(false)}
         footer={null}
+        centered
       >
-        <Slider {...settingsCart}>
-          {data.img?.map((url, i) => (
-            <img key={i} src={url} alt={`modal-img-${i}`} className="w-full" />
-          ))}
-        </Slider>
-      </Modal> */}
+        <h3>Bạn có chắc chắn muốn xóa bài viết này?</h3>
+        <p>Hành động này không thể hoàn tác.</p>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: 24 }}>
+          <button
+            onClick={() => setIsDeleteConfirmOpen(false)}
+            style={{
+              padding: "8px 16px",
+              border: "1px solid #ccc",
+              borderRadius: 4,
+              background: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Hủy
+          </button>
+
+          <button
+            onClick={async () => {
+              try {
+                await postApi.deletePost(data._id);
+                message.success("Đã xóa bài viết.");
+                setIsDeleteConfirmOpen(false);
+                // Cập nhật UI: ví dụ gọi reload hoặc xóa khỏi danh sách
+              } catch (err) {
+                console.error(err);
+                message.error("Không thể xóa bài viết.");
+              }
+            }}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#ff4d4f",
+              color: "#fff",
+              border: "none",
+              borderRadius: 4,
+              cursor: "pointer",
+            }}
+          >
+            Xóa
+          </button>
+        </div>
+      </Modal>
+
+      <EditPostModal
+        open={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        data={data}
+        onSubmit={handleUpdatePost}
+      />
+
+
+
     </StyleCartPost>
   );
 };
 
 export default Post;
+
+const pulse = keyframes`
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+`;
 
 const StyleCartPost = styled.div`
   border-bottom: 1px solid #dbdbdb;
@@ -267,6 +481,10 @@ const StyleCartPost = styled.div`
   flex-direction: column;
   height: 100%;
   position: relative;
+
+  .like-animation {
+    animation: ${pulse} 0.4s ease-in-out;
+  }
 
   .cartpost_title {
     display: flex;
@@ -390,4 +608,4 @@ const StyleCartPost = styled.div`
     color: #737373;
     font-weight: 400;
   }
-`;
+`

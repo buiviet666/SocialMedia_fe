@@ -21,6 +21,8 @@ type Props = {
   images: File[];
   control: Control<any>;
   setValue: UseFormSetValue<any>;
+  selectedFriends?: any;
+  setSelectedFriends: (list: any) => void;
 };
 
 const CreatePost = ({
@@ -29,10 +31,15 @@ const CreatePost = ({
   setImages,
   images,
   control,
-  setValue
+  setValue,
+  selectedFriends,
+  setSelectedFriends
 }: Props) => {
   const [showPopup, setShowPopup] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [friendsList, setFriendsList] = useState<any[]>([]);
+
 
   const content = useWatch({ control, name: "content" });
   const valuePrivacy = useWatch({ control, name: "privacy" });
@@ -41,7 +48,20 @@ const CreatePost = ({
     return images.map((file) => URL.createObjectURL(file));
   }, [images]);
 
+  const toggleSelectFriend = (friendId: string) => {
+    setSelectedFriends((prev: string[]) =>
+      prev.includes(friendId)
+        ? prev.filter((id) => id !== friendId)
+        : [...prev, friendId]
+    );
+  };
+
   useEffect(() => {
+    setFriendsList([
+      { _id: "664028adf5f2e5a515a50742", userName: "Alice" },
+      { _id: "66402a1df5f2e5a515a50831", userName: "Bob" },
+      { _id: "66402a1df5f2e5a515a50899", userName: "Charlie" },
+    ]);
     return () => {
       previews.forEach((url) => URL.revokeObjectURL(url));
     };
@@ -64,7 +84,7 @@ const CreatePost = ({
     },
     {
       key: 2,
-      name: 'FRIEND',
+      name: 'FRIENDS',
       openPopup: false,
       description: 'People who follow you can see',
       icon: <FaUserFriends />
@@ -155,7 +175,10 @@ const CreatePost = ({
             name="location"
             control={control}
             defaultValue=""
-            rules={{ maxLength: { value: 1500, message: 'Content must be less than 1500 characters' } }}
+            rules={{
+              required: "Content is required",
+              maxLength: { value: 1500, message: "Content must be less than 1500 characters" },
+            }}
             render={({ field, fieldState }) => (
               <FormItem>
                 <label htmlFor='location'><b>Location</b></label>
@@ -280,7 +303,10 @@ const CreatePost = ({
               name="content"
               control={control}
               defaultValue=""
-              rules={{ maxLength: { value: 1500, message: 'Content must be less than 1500 characters' } }}
+              rules={{
+                required: "Content is required",
+                maxLength: { value: 1500, message: "Content must be less than 1500 characters" },
+              }}
               render={({ field, fieldState }) => (
                 <>
                   <TextArea
@@ -312,13 +338,31 @@ const CreatePost = ({
       )}
       <Modal
         open={showPopup}
-        onOk={() => console.log('hhhhhhhdwj')}
+        onOk={() => setShowPopup(false)}
         onCancel={() => setShowPopup(false)}
         okText="Save"
         cancelText="Cancel"
         centered
-        >
-          <h1>hhhhhhhh</h1>
+      >
+        <h3>Chọn bạn bè</h3>
+        <div>
+          {friendsList.map((friend: any) => (
+            <FriendItem
+              key={friend._id}
+              onClick={() => toggleSelectFriend(friend._id)}
+            >
+              <Avatar src={friend.avatarUrl} alt={friend.userName}>
+                {friend.userName[0]}
+              </Avatar>
+              <FriendName>{friend.userName}</FriendName>
+              <Checkbox
+                type="checkbox"
+                checked={selectedFriends.includes(friend._id)}
+                readOnly
+              />
+            </FriendItem>
+          ))}
+        </div>
       </Modal>
     </CreateStyled>
   );
@@ -485,4 +529,26 @@ const FormItem = styled.div`
     margin: 0;
     min-height: 40px;
   }
+`;
+
+const FriendItem = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+  cursor: pointer;
+  &:hover {
+    background: #f0f0f0;
+  }
+`;
+
+const FriendName = styled.span`
+  margin-left: 12px;
+  flex: 1;
+`;
+
+const Checkbox = styled.input`
+  margin-left: auto;
 `;

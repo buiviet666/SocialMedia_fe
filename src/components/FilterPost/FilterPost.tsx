@@ -3,24 +3,12 @@ import { Dropdown, MenuProps } from "antd";
 import * as React from "react";
 import styled from "styled-components";
 
-export default function FilterPost() {
+export default function FilterPost({ onChangeFilter }: { onChangeFilter: (key: string, label: string) => void }) {
   const items: MenuProps["items"] = [
-    {
-      label: "Dành cho bạn",
-      key: "1",
-    },
-    {
-      label: "Đang theo dõi",
-      key: "2",
-    },
-    {
-      label: "Đã thích",
-      key: "3",
-    },
-    {
-      label: "Đã lưu",
-      key: "4",
-    },
+    { label: "Dành cho bạn", key: "1" },
+    { label: "Đang theo dõi", key: "2" },
+    { label: "Đã thích", key: "3" },
+    { label: "Đã lưu", key: "4" },
   ];
 
   return (
@@ -28,7 +16,10 @@ export default function FilterPost() {
       <div className="filter-post_container">
         <span>Dành cho bạn</span>
         <Dropdown
-          menu={{ items }}
+          menu={{ items, onClick: ({ key, domEvent }) => {
+            const label = (domEvent.target as HTMLElement).innerText;
+            onChangeFilter(key, label);
+          }}}
           trigger={["click"]}
           placement="bottom"
           arrow
@@ -42,6 +33,7 @@ export default function FilterPost() {
     </StyleFilterPost>
   );
 }
+
 
 const StyleFilterPost = styled.div`
   height: 60px;

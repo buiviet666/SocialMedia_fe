@@ -26,6 +26,7 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import logoMain from '../../../logoMain.svg';
 import Message from "../Message";
+import postApi from "../../apis/api/postApi";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -39,10 +40,13 @@ const Navbar = () => {
   const [showCreatePostConfirm, setShowCreatePostConfirm] = useState(false);
   const [step, setStep] = useState<"select" | "compose">("select");
   const [images, setImages] = useState<File[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+
+console.log("selectedFriends", selectedFriends);
 
   const navigate = useNavigate();
 
-  const { control, handleSubmit, setValue} = useForm({
+  const { control, handleSubmit, setValue, reset} = useForm({
     mode: "onBlur",
     reValidateMode: "onChange",
     delayError: 200,
@@ -53,15 +57,6 @@ const Navbar = () => {
       privacy: 'PUBLIC'
     },
   });
-
-  const testServer = async () => {
-    try {
-      const res: any = await authApi.testApi();
-      console.log(res);
-    } catch (error) {
-      console.log(error);
-    }
-  }
 
   const handleLogout = async () => {
     const refreshToken =
@@ -84,6 +79,7 @@ const Navbar = () => {
       localStorage.removeItem(REFRESH_TOKEN);
       sessionStorage.removeItem(ACCESS_TOKEN);
       sessionStorage.removeItem(REFRESH_TOKEN);
+      localStorage.removeItem("userId");
       
       navigate("/auth/login");
     }
@@ -115,24 +111,41 @@ const Navbar = () => {
     setStep("select");
     setImages([]);
     setChildrenComponent(null);
+    reset();
+    setSelectedFriends?.([]);
   };
 
-  const handleCreatePost = (values: any) => {
+  const handleCreatePost = async (values: any) => {
     if (!values.content.trim() && images.length === 0) {
       message.warning("Vui lòng nhập nội dung hoặc chọn ít nhất 1 ảnh");
       return;
     }
 
-    const dataToSubmit = {
-      content: values.content,
-      title: values.title,
-      location: values.location,
-      privacy: values.privacy,
-      media: images,
-    };
+    const formData = new FormData();
+    formData.append("content", values.content);
+    formData.append("title", values.title);
+    formData.append("location", values.location);
+    formData.append("privacy", values.privacy);
 
-    console.log("Submitting post:", dataToSubmit);
-    // Call API here
+    if (values.privacy === 'FRIENDONLY' || values.privacy === 'EXCEPTFRIEND') {
+      formData.append("visibilitySetting", JSON.stringify({
+        type: values.privacy === 'FRIENDONLY' ? 'ALLOWED' : 'EXCLUDED',
+        userIds: selectedFriends
+      }));
+    }
+
+    // Append từng file ảnh
+    images.forEach((file) => {
+      formData.append("media", file);
+    });
+
+    try {
+      await postApi.createPost(formData); // Call API tạo bài viết
+      toast.success("Post created successfully!");
+      resetForm();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Error creating post!");
+    }
   };
 
   const items: MenuProps["items"] = [
@@ -218,16 +231,14 @@ const Navbar = () => {
           setImages={setImages}
           control={control}
           setValue={setValue}
+          selectedFriends={selectedFriends}
+          setSelectedFriends={setSelectedFriends}
         />
       ),
       title: "Tạo bài viết mới",
     },
     { icon: <UserOutlined />, path: "/profile", component: <Profile /> },
   ];
-
-  useEffect(() => {
-    testServer();
-  }, []);
 
   return (
     <StyleMainNavbarPC>
@@ -304,7 +315,9 @@ const Navbar = () => {
             setImages,
             images,
             control,
-            setValue
+            setValue,
+            setSelectedFriends,
+            selectedFriends
           })}
       </ModalStyled>
       <Modal

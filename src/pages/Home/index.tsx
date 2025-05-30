@@ -6,158 +6,88 @@ import { List, Skeleton } from "antd";
 import Footer from "../../components/Footer";
 import Post from "../../components/Post";
 import { useDraggable } from "react-use-draggable-scroll";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import postApi from "../../apis/api/postApi";
 
 export default function Home() {
   const cartPostRef = useRef<HTMLDivElement>(null!);
+  const [filterLabel, setFilterLabel] = useState("Dành cho bạn");
+  const [loading, setLoading] = useState(false);
   const { events } = useDraggable(cartPostRef);
-  const [data, setData] = useState([
-  {
-    id: "p1",
-    name: "Jack Nguyen",
-    avatar: "https://i.pravatar.cc/150?img=11",
-    location: "Đà Lạt, Việt Nam",
-    likes: 152,
-    caption: "Sáng sớm đón nắng ở Đồi chè Cầu Đất 🍃",
-    img: [
-      "https://picsum.photos/id/1015/600/400",
-      "https://picsum.photos/id/1016/600/400",
-    ],
-  },
-  {
-    id: "p2",
-    name: "Linh Chi",
-    avatar: "https://i.pravatar.cc/150?img=32",
-    location: "Sa Pa, Lào Cai",
-    likes: 300,
-    caption: "Săn mây thành công rồi mọi người ơi ☁️",
-    img: [
-      "https://picsum.photos/id/1025/600/400",
-      "https://picsum.photos/id/1026/600/400",
-    ],
-  },
-  {
-    id: "p3",
-    name: "Minh Tuấn",
-    avatar: "https://i.pravatar.cc/150?img=18",
-    location: "Hội An, Quảng Nam",
-    likes: 478,
-    caption: "Chút cổ kính giữa lòng phố Hội ✨",
-    img: [
-      "https://picsum.photos/id/1033/600/400",
-      "https://picsum.photos/id/1034/600/400",
-    ],
-  },
-  {
-    id: "p4",
-    name: "Yến Nhi",
-    avatar: "https://i.pravatar.cc/150?img=22",
-    location: "Biển Mỹ Khê, Đà Nẵng",
-    likes: 210,
-    caption: "Tắm nắng, uống nước dừa và chill ☀️🥥",
-    img: [
-      "https://picsum.photos/id/1041/600/400",
-      "https://picsum.photos/id/1042/600/400",
-    ],
-  },
-  {
-    id: "p5",
-    name: "Hoàng Long",
-    avatar: "https://i.pravatar.cc/150?img=45",
-    location: "Thác Bản Giốc, Cao Bằng",
-    likes: 125,
-    caption: "Thiên nhiên hùng vĩ quá đỗi 💦",
-    img: [
-      "https://picsum.photos/id/1050/600/400",
-      "https://picsum.photos/id/1052/600/400",
-    ],
-  },
-  {
-    id: "p6",
-    name: "Trà My",
-    avatar: "https://i.pravatar.cc/150?img=39",
-    location: "Ninh Bình",
-    likes: 382,
-    caption: "Thuyền trôi giữa núi non xanh ngắt 🛶",
-    img: [
-      "https://picsum.photos/id/1065/600/400",
-      "https://picsum.photos/id/1066/600/400",
-    ],
-  },
-  {
-    id: "p7",
-    name: "Ngọc Hân",
-    avatar: "https://i.pravatar.cc/150?img=52",
-    location: "Hà Nội",
-    likes: 89,
-    caption: "Cà phê trứng sáng chủ nhật ☕️",
-    img: [
-      "https://picsum.photos/id/1070/600/400",
-    ],
-  },
-  {
-    id: "p8",
-    name: "Khánh Duy",
-    avatar: "https://i.pravatar.cc/150?img=57",
-    location: "Cần Thơ",
-    likes: 147,
-    caption: "Chợ nổi rộn ràng, tấp nập 🌊",
-    img: [
-      "https://picsum.photos/id/1081/600/400",
-      "https://picsum.photos/id/1082/600/400",
-    ],
-  },
-  {
-    id: "p9",
-    name: "Bảo Anh",
-    avatar: "https://i.pravatar.cc/150?img=28",
-    location: "Thủ Đức, Sài Gòn",
-    likes: 234,
-    caption: "Chiều chill rooftop cùng bạn bè 🌇",
-    img: [
-      "https://picsum.photos/id/1091/600/400",
-      "https://picsum.photos/id/1092/600/400",
-    ],
-  },
-  {
-    id: "p10",
-    name: "Phúc Hưng",
-    avatar: "https://i.pravatar.cc/150?img=16",
-    location: "Phú Quốc",
-    likes: 512,
-    caption: "Hoàng hôn đẹp nhất là khi có em bên cạnh 🧡",
-    img: [
-      "https://picsum.photos/id/1100/600/400",
-      "https://picsum.photos/id/1101/600/400",
-      "https://picsum.photos/id/1102/600/400",
-    ],
-  },
-]);
+  const [data, setData] = useState<any[]>([]);
+  const currentUserId = localStorage.getItem("userId");
+  const [isLiking, setIsLiking] = useState(false);
+  const [isLiked, setIsLiked] = useState<boolean>(false);
+  const [animateLike, setAnimateLike] = useState(false);
+  const [likesCount, setLikesCount] = useState<number>(0);
+  
+  
+  // console.log("isLiked", isLiked);
+  // console.log("animateLike", animateLike);
+  // console.log("likesCount", likesCount);
+  
+  
 
-  const loadMoreData = () => {
-    const newItems = Array.from({ length: 5 }, (_, index) => {
-    const baseId = data.length + index + 100;
-    return {
-      id: `new-${baseId}`,
-      name: `User ${baseId}`,
-      avatar: `https://i.pravatar.cc/150?img=${(baseId % 70) + 1}`,
-      location: `Địa điểm ${baseId}`,
-      likes: Math.floor(Math.random() * 500),
-      caption: `Caption ngẫu nhiên cho bài viết ${baseId}`,
-      img: [
-        `https://picsum.photos/id/${baseId}/600/400`,
-        `https://picsum.photos/id/${baseId + 1}/600/400`,
-      ],
-    };
-  });
+  const loadDataByFilter = useCallback(async (key: string) => {
+    setLoading(true);
+    try {
+      let res;
+      switch (key) {
+        case "1":
+          res = await postApi.getPostsByPrivacy("PUBLIC");
+          break;
+        case "2":
+          res = await postApi.getFriendPosts();
+          break;
+        case "3":
+          res = await postApi.getLikedPosts();
+          break;
+        case "4":
+          res = await postApi.getSavedPosts();
+          break;
+        default:
+          res = { data: [] };
+      }
+      setData(res.data);
+    } catch (error) {
+      console.error("Lỗi khi tải dữ liệu:", error);
+    }
+    setLoading(false);
+  }, []);
 
-    setData((prevData) => [...prevData, ...newItems]);
+  const handleFilterChange = (key: string, label: string) => {
+    setFilterLabel(label);
+    loadDataByFilter(key);
   };
+
+  // const toggleLike = async (idPost: string) => {
+  //   if (isLiking) return;
+  //   setIsLiking(true);
+  //   try {
+  //     const res: any = await postApi.toggleLike({ postId: idPost });
+      
+  //     if (res?.message === "Like") {
+  //       setIsLiked(true);
+  //       setAnimateLike(true);
+  //     } else if (res?.message === "unLike") {
+  //       setIsLiked(false);
+  //     }
+  //     setLikesCount(res?.totalLikes);
+  //   } catch (err) {
+  //     console.log(err);
+  //   } finally {
+  //     setIsLiking(false);
+  //   }
+  // };
+
+  useEffect(() => {
+    loadDataByFilter("1");
+  }, []);
 
   return (
     <StyleHome>
       <div className="home_content-container">
-        <FilterPost />
+        <FilterPost onChangeFilter={handleFilterChange} />
         <div
           id="scrollableDiv"
           className="cartPost_main"
@@ -166,15 +96,17 @@ export default function Home() {
         >
           <InfiniteScroll
             dataLength={data.length}
-            next={loadMoreData}
-            hasMore={data.length < 50}
+            next={() => {}}
+            hasMore={false}
             loader={<Skeleton avatar paragraph={{ rows: 1 }} active />}
             endMessage={<Footer />}
             scrollableTarget="scrollableDiv"
           >
             <List
               dataSource={data}
-              renderItem={(item) => <Post data={item} key={item.id} />}
+              renderItem={(item: any) => <Post data={item} key={item._id} 
+              // callData={toggleLike} isLiked={isLiked} animateLike={animateLike} likesCount={likesCount}
+              />}
             />
           </InfiniteScroll>
         </div>

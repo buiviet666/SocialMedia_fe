@@ -8,6 +8,25 @@ import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
 import { hideLoading, showLoading } from "../store/loadingSlice";
 import { store } from "../store";
 
+export interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
+  metadata?: {
+    startTime?: Date;
+    minLoading?: number;
+  };
+}
+
+const getToken = (key: string): string | null => {
+  return localStorage.getItem(key) || sessionStorage.getItem(key);
+};
+
+const setToken = (key: string, value: string) => {
+  if (localStorage.getItem(key)) {
+    localStorage.setItem(key, value);
+  } else {
+    sessionStorage.setItem(key, value);
+  }
+};
+
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_BASE_API,
   withCredentials: true,
@@ -35,13 +54,20 @@ const stopLoading = () => {
 
 axiosClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    const customConfig = config as CustomAxiosRequestConfig;
     startLoading();
-    (config as any).metadata = { startTime: new Date() };
-    const token = localStorage.getItem(ACCESS_TOKEN);
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+
+    customConfig.metadata = {
+      startTime: new Date(),
+      minLoading: customConfig.metadata?.minLoading ?? MIN_LOADING_DURATION,
+    };
+
+    const token = getToken(ACCESS_TOKEN);
+    if (token && customConfig.headers) {
+      customConfig.headers.Authorization = `Bearer ${token}`;
     }
-    return config;
+
+    return customConfig;
   },
   (error) => {
     stopLoading();
@@ -51,22 +77,25 @@ axiosClient.interceptors.request.use(
 
 axiosClient.interceptors.response.use(
   async (response: AxiosResponse) => {
-    const startTime = (response.config as any).metadata?.startTime;
-    const timeSpent = new Date().getTime() - startTime.getTime();
-    const delay = Math.max(0, MIN_LOADING_DURATION - timeSpent);
+    const customConfig = response.config as CustomAxiosRequestConfig;
+    const metadata = customConfig.metadata;
+    const timeSpent =
+      new Date().getTime() - (metadata?.startTime?.getTime() ?? 0);
+    const delay = Math.max(0, (metadata?.minLoading ?? MIN_LOADING_DURATION) - timeSpent);
 
     setTimeout(stopLoading, delay);
     return response.data;
   },
   async (error: AxiosError) => {
-
-    const startTime = (error.config as any).metadata?.startTime;
-    const timeSpent = startTime ? new Date().getTime() - startTime.getTime() : 0;
-    const delay = Math.max(0, MIN_LOADING_DURATION - timeSpent);
+    const customConfig = error.config as CustomAxiosRequestConfig;
+    const metadata = customConfig?.metadata;
+    const timeSpent =
+      new Date().getTime() - (metadata?.startTime?.getTime() ?? 0);
+    const delay = Math.max(0, (metadata?.minLoading ?? MIN_LOADING_DURATION) - timeSpent);
 
     setTimeout(stopLoading, delay);
 
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = customConfig as CustomAxiosRequestConfig & { _retry?: boolean };
     const isUnauthorized = error.response?.status === 401;
     const isNotRetrying = !originalRequest._retry;
     const isNotRefreshEndpoint = !originalRequest.url?.includes("/auth/resetAccessToken");
@@ -75,29 +104,28 @@ axiosClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem(REFRESH_TOKEN);
+        const refreshToken = getToken(REFRESH_TOKEN);
+        if (!refreshToken) throw new Error("No refresh token");
 
-        if (!refreshToken) throw new Error('No refresh token');
-
-        // Gọi API refresh để lấy accessToken mới
         const res = await axios.post(`${import.meta.env.VITE_BASE_API}/auth/resetAccessToken`, {
           refreshToken,
         });
 
         const { accessToken, refreshToken: newRefreshToken } = res.data.data;
-        localStorage.setItem(ACCESS_TOKEN, accessToken);
-        localStorage.setItem(REFRESH_TOKEN, newRefreshToken);
+
+        setToken(ACCESS_TOKEN, accessToken);
+        setToken(REFRESH_TOKEN, newRefreshToken);
 
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         }
 
-        // Gửi lại request cũ với token mới
         return axiosClient(originalRequest);
       } catch (err) {
-        // Nếu refreshToken cũng hết hạn → logout
         localStorage.removeItem(ACCESS_TOKEN);
         localStorage.removeItem(REFRESH_TOKEN);
+        sessionStorage.removeItem(ACCESS_TOKEN);
+        sessionStorage.removeItem(REFRESH_TOKEN);
         window.location.href = "/auth/login";
         return Promise.reject(err);
       }
