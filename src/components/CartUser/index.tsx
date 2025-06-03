@@ -1,16 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled, { css } from 'styled-components';
 import { Avatar, Button } from 'antd';
 import { UserOutlined, UploadOutlined } from '@ant-design/icons';
+import toast from 'react-hot-toast';
+import userApi from '../../apis/api/userApi';
+import { useNavigate } from 'react-router-dom';
 
 export interface CartUserProps {
-  dataItem?: {
-    name?: string;
-    des?: string;
-    avatar?: string;
-  };
-  isFollow?: boolean;
-  onToggleFollow?: () => void;
+  dataItem?: any;
+  isFollow?: boolean; // giữ để tương thích, không dùng nữa
+  onToggleFollow?: () => void; // fallback nếu muốn xử lý bên ngoài
   onChangeAvatar?: () => void;
   size?: 'small' | 'medium' | 'large';
 }
@@ -23,12 +22,34 @@ const avatarSizeMap = {
 
 const CartUser = ({
   dataItem,
-  isFollow,
   onToggleFollow,
   onChangeAvatar,
   size = 'medium',
 }: CartUserProps) => {
   const avatarSize = avatarSizeMap[size];
+  const [isFollowing, setIsFollowing] = useState<boolean>(dataItem?.isFollowing || false);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const currentUserId = localStorage.getItem('userId');
+
+  const handleFollowToggle = async () => {
+    if (!dataItem?._id) return;
+    setLoading(true);
+    try {
+      if (isFollowing) {
+        await userApi.unfollowUser(dataItem._id);
+        toast.success('Đã hủy theo dõi');
+      } else {
+        await userApi.followUser(dataItem._id);
+        toast.success('Đã theo dõi');
+      }
+      setIsFollowing(!isFollowing);
+      onToggleFollow?.(); // gọi callback nếu có
+    } catch (err) {
+      toast.error('Thao tác thất bại!');
+    }
+    setLoading(false);
+  };
 
   return (
     <StyleCartUser $size={size}>
@@ -51,13 +72,21 @@ const CartUser = ({
           )}
         </div>
         <div className="cartuser_info">
-          <span className="cartuser_name">{dataItem?.name || 'Tên người dùng'}</span>
-          <div className="cartuser_desc">{dataItem?.des || 'Mô tả ngắn'}</div>
+          <span className="cartuser_name" onClick={() => navigate(`/profile/${dataItem._id}`)}>
+            {dataItem?.name || dataItem?.nameDisplay || dataItem?.userName}
+          </span>
+          <div className="cartuser_desc">{dataItem?.bio || 'Mô tả ngắn'}</div>
         </div>
       </div>
-      {typeof isFollow !== 'undefined' && (
-        <div className="cartuser_follow" onClick={onToggleFollow}>
-          {isFollow ? 'Đã theo dõi' : 'Theo dõi'}
+      {dataItem?._id && dataItem._id !== currentUserId && (
+        <div className="cartuser_follow" onClick={handleFollowToggle}>
+          <Button
+            size="small"
+            loading={loading}
+            type={isFollowing ? 'default' : 'primary'}
+          >
+            {isFollowing ? 'Đã theo dõi' : 'Theo dõi'}
+          </Button>
         </div>
       )}
     </StyleCartUser>
@@ -98,11 +127,17 @@ const StyleCartUser = styled.div<{ $size: 'small' | 'medium' | 'large' }>`
   .cartuser_info {
     display: flex;
     flex-direction: column;
+    max-width: 150px;
+
   }
 
   .cartuser_name {
     font-weight: 600;
+    cursor: pointer;
     color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     ${({ $size }) =>
       $size === 'small'
         ? css`font-size: 14px;`

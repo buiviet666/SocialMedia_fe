@@ -25,6 +25,8 @@ const postApi = {
   getPostById: (id: string) => axiosClient.get(`/posts/${id}`),
   deletePost: (postId: string) => axiosClient.delete(`/posts/${postId}`),
   updatePost: (id: string, data: any) => axiosClient.put(`/posts/${id}`, data),
+  getPostsByUserId: (userId: string) => axiosClient.get(`/posts/user/${userId}`),
+  getPostLikes: (postId: string) => axiosClient.get(`/posts/${postId}/likes`),
 
 }
 

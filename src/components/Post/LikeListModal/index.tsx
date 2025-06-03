@@ -1,13 +1,21 @@
-import { Modal, List, Avatar } from "antd";
-import React from "react";
+import { Modal } from "antd";
+import CartUser from "../../CartUser";
+
+interface UserLike {
+  _id: string;
+  userName: string;
+  nameDisplay?: string;
+  avatar?: string;
+  id?: string;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  data: { username: string; avatar?: string }[];
+  users: UserLike[];
 }
 
-const LikeListModal = ({ open, onClose, data }: Props) => {
+const LikeListModal = ({ open, onClose, users }: Props) => {
   return (
     <Modal
       title="Danh sách người đã thích"
@@ -15,18 +23,9 @@ const LikeListModal = ({ open, onClose, data }: Props) => {
       onCancel={onClose}
       footer={null}
     >
-      <List
-        itemLayout="horizontal"
-        dataSource={data}
-        renderItem={(item) => (
-          <List.Item>
-            <List.Item.Meta
-              avatar={<Avatar src={item.avatar} />}
-              title={item.username}
-            />
-          </List.Item>
-        )}
-      />
+      {users.map((user) => (
+        <CartUser key={user._id} dataItem={user} size="small" />
+      ))}
     </Modal>
   );
 };

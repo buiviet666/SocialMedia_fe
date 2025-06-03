@@ -25,6 +25,8 @@ import LikeListModal from "./LikeListModal";
 import ReportPostModal from "./ReportPostModal";
 import { Modal } from "antd";
 import EditPostModal from "./EditPostModal";
+import { formatTimeFromNow } from "../../utils/functionCommon";
+import toast from "react-hot-toast";
 
 interface Props {
   data?: any;
@@ -46,21 +48,14 @@ const Post = ({ data }: Props) => {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-
+  const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
+  const [likeUsers, setLikeUsers] = useState([]);
 
 
   const isOwnPost = currentUserId === data?.userId?._id;
-
-  const mockLikedUsers = [
-    { username: "an.nguyen", avatar: "https://i.pravatar.cc/150?img=1" },
-    { username: "bao.tran", avatar: "https://i.pravatar.cc/150?img=2" },
-    { username: "linh.le", avatar: "https://i.pravatar.cc/150?img=3" },
-  ];
-
 
   useEffect(() => {
     if (data?.likes && currentUserId) {
@@ -197,10 +192,9 @@ const Post = ({ data }: Props) => {
   const handleSharePost = async (message: string) => {
     try {
       await postApi.sharePost({ postId: data._id, message });
-      message.success("Chia sẻ bài viết thành công!");
+      toast.success("Chia sẻ bài viết thành công!");
     } catch (err) {
-      message.error("Không thể chia sẻ bài viết.");
-      console.error(err);
+      toast.error("Không thể chia sẻ bài viết.");
     } finally {
       setIsShareOpen(false);
     }
@@ -247,6 +241,28 @@ const Post = ({ data }: Props) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const fetchLikes = async () => {
+    try {
+      const res = await postApi.getPostLikes(data._id); // gọi API mới tạo
+      setLikeUsers(res.data); // danh sách user
+    } catch (err) {
+      console.error('Error fetching likes:', err);
+    }
+  };
+
+  const handleOpenLikeModal = () => {
+    fetchLikes(); // gọi API trước khi mở
+    setIsLikeModalOpen(true);
+  };
+
+  const handleClickName = (id: any) => {
+    if (currentUserId === id?.userId?._id) {
+      navigate("/profile");
+    } else {
+      navigate(`/profile/${id?.userId?._id}`);
+    }
+  }
+  
 
   return (
     <StyleCartPost>
@@ -260,10 +276,13 @@ const Post = ({ data }: Props) => {
             />
           </div>
           <div className="cartpost_title-container">
-            <div className="cartpost_title-info">
-              {data?.userId?.username || "Ẩn danh"} <span>• 1 giờ trước</span>
+            <div className="cartpost_title-info" onClick={() => handleClickName(data)}>
+              {data?.userId?.userName && data?.userId?.nameDisplay} 
+              <span> • {formatTimeFromNow(data?.createdAt)}</span>
             </div>
-            <div className="cartpost_title-location">{data?.location || ""}</div>
+            <div className="cartpost_title-location">
+              {data?.location || ""}
+            </div>
           </div>
         </div>
         <div className="cartpost_title-iconmore">
@@ -329,7 +348,7 @@ const Post = ({ data }: Props) => {
 
         <div
           className="cartpost_title-likes"
-          onClick={() => setIsLikeModalOpen(true)}
+          onClick={handleOpenLikeModal}
           style={{ cursor: "pointer" }}
         >
           {likesCount} lượt thích
@@ -388,7 +407,7 @@ const Post = ({ data }: Props) => {
       <LikeListModal
         open={isLikeModalOpen}
         onClose={() => setIsLikeModalOpen(false)}
-        data={mockLikedUsers}
+        users={likeUsers}
       />
 
       <ReportPostModal
@@ -602,6 +621,7 @@ const StyleCartPost = styled.div`
     font-weight: 600;
     line-height: 18px;
     color: #000000;
+    cursor: pointer;
   }
 
   .cartpost_title-info span {

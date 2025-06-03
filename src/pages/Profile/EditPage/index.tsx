@@ -1,9 +1,10 @@
-import { MailOutlined } from '@ant-design/icons';
+import { MailOutlined, SettingOutlined } from '@ant-design/icons';
 import { Menu, MenuProps } from 'antd';
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import EditInfo from './EditInfo';
 import EditVerifyInfo from './EditVerifyInfo';
+import AdvancedAccountSetting from './AdvancedAccountSetting';
 
 const EditPage = () => {
   const [current, setCurrent] = useState('info');
@@ -20,6 +21,11 @@ const EditPage = () => {
       key: 'password',
       icon: <MailOutlined />,
     },
+    {
+      label: 'Cài đặt nâng cao tài khoản',
+      key: 'advanced',
+      icon: <SettingOutlined />,
+    },
   ];
 
   const onClick: MenuProps['onClick'] = (e) => {
@@ -33,6 +39,7 @@ const EditPage = () => {
         <div className="edit-content">
           {current === 'info' && <EditInfo />}
           {current === 'password' && <EditVerifyInfo />}
+          {current === 'advanced' && <AdvancedAccountSetting />}
         </div>
       </div>
     </StyleEditPage>

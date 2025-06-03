@@ -25,6 +25,7 @@ import StatisticsPage from "../pages/Admin/StatisticsPage";
 import UserManagementPage from "../pages/Admin/UserManagementPage";
 import PostManagementPage from "../pages/Admin/PostManagementPage";
 import RolePage from "../pages/Admin/RolePage";
+import VerifyEmail from "../pages/VerifyEmail";
 
 const RoutesList = createBrowserRouter([
   {
@@ -36,7 +37,7 @@ const RoutesList = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Home /> },
-      { path: "profile", element: <Profile /> },
+      { path: "profile/:id?", element: <Profile /> },
       { path: "profile/liked", element: <LikedPage /> },
       { path: "profile/edit", element: <EditPage /> },
       { path: "suggest-friend", element: <SuggestFriend /> },
@@ -52,6 +53,7 @@ const RoutesList = createBrowserRouter([
       { path: "register", element: <Register /> },
       { path: "forgot-password", element: <ForgotPage /> },
       { path: "reset-password", element: <ResetPassword /> },
+      { path: "verify-email", element: <VerifyEmail />}
     ],
   },
   {

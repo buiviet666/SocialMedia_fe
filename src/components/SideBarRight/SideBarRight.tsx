@@ -1,22 +1,82 @@
-import * as React from "react";
 import styled from "styled-components";
 import Footer from "../Footer";
 import CartUser from "../CartUser";
-import { Avatar } from "antd";
+import { Avatar, Spin } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { dataSuggested } from "../../utils/mockdata";
+import userApi from "../../apis/api/userApi";
+import { useEffect, useState } from "react";
+import moment from "moment";
+
+const DEFAULT_AVATAR = "default-avatar.jpg";
+const DEFAULT_AVATAR_URL = "/images/default-avatar.png"; // bạn có thể thay bằng URL CDN
 
 export default function SideBarRight() {
   const navigate = useNavigate();
+  const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchSuggestedUsers = async () => {
+      try {
+        setLoading(true);
+        const res = await userApi.getRecommendedUsers();
+        const rawUsers = res?.data || [];
+
+        const topFive = rawUsers.slice(0, 5).map((user: any) => ({
+          _id: user._id || user.id,
+          avatar:
+            !user.avatar || user.avatar === DEFAULT_AVATAR
+              ? DEFAULT_AVATAR_URL
+              : user.avatar,
+          name: user.nameDisplay || user.userName,
+          des: '',
+          isFollowing: user.isFollowing || false,
+          bio: user?.bio
+        }));
+
+        setSuggestedUsers(topFive);
+      } catch (error) {
+        console.error("Lỗi khi lấy gợi ý người dùng:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSuggestedUsers();
+  }, []);
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await userApi.getCurrentUser(); // đã có rồi
+        setCurrentUser(res?.data);
+      } catch (error) {
+        console.error("Không thể lấy thông tin người dùng:", error);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   return (
     <StyleSideBarRight>
       <div className="user_profile">
-        <Avatar size="large" icon={<UserOutlined />} />
+        <Avatar
+          size="large"
+          src={currentUser?.avatar}
+          icon={!currentUser?.avatar && <UserOutlined />}
+        />
         <div className="user_info">
-          <span className="user_name">Buiviet</span>
-          <span className="user_location">Thành viên từ 2024</span>
+          <span className="user_name" onClick={() => navigate("/profile")}>
+            {currentUser?.nameDisplay || currentUser?.userName || 'Người dùng'}
+          </span>
+          <span className="user_location">
+            {currentUser?.createdAt
+              ? `Member from ${moment(currentUser.createdAt).format('MMMM YYYY')}`
+              : 'Đang tải thông tin...'}
+          </span>
         </div>
       </div>
 
@@ -27,9 +87,15 @@ export default function SideBarRight() {
         </div>
 
         <div className="suggest_users">
-          {dataSuggested.map((item, idx) => (
-            <CartUser dataItem={item} key={idx} isFollow size="small" />
-          ))}
+          {loading ? (
+            <Spin />
+          ) : suggestedUsers.length > 0 ? (
+            suggestedUsers.map((user) => (
+              <CartUser dataItem={user} key={user._id} size="small" />
+            ))
+          ) : (
+            <div className="no_suggestion">Không có gợi ý nào</div>
+          )}
         </div>
       </div>
 
@@ -45,6 +111,7 @@ const StyleSideBarRight = styled.div`
   display: flex;
   flex-direction: column;
   gap: 24px;
+  width: 100%;
 
   .user_profile {
     display: flex;
@@ -62,6 +129,11 @@ const StyleSideBarRight = styled.div`
     font-weight: 600;
     font-size: 14px;
     color: #262626;
+    cursor: pointer;
+  }
+
+  .user_name:hover {
+    text-decoration: underline;
   }
 
   .user_location {
@@ -104,4 +176,12 @@ const StyleSideBarRight = styled.div`
     flex-direction: column;
     gap: 8px;
   }
+
+  .no_suggestion {
+    font-size: 13px;
+    color: #999;
+    text-align: center;
+    padding: 12px 0;
+  }
+
 `;
