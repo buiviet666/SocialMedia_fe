@@ -1,18 +1,20 @@
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useEffect, useState, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { Spin, Avatar, Input, Button } from "antd";
-import { UserOutlined } from "@ant-design/icons";
+import {
+  UserOutlined,
+  HeartFilled,
+  HeartOutlined,
+  MessageOutlined,
+  SendOutlined,
+  SmileOutlined,
+} from "@ant-design/icons";
+import moment from "moment";
 import postApi from "../../apis/api/postApi";
-
-// type PostDetail = {
-//   _id: string;
-//   photoUrls: { url: string }[];
-//   userId: { _id: string; username: string; avatar?: string };
-//   location?: string;
-//   content?: string;
-//   comments?: { _id: string; user: { username: string; avatar?: string }; text: string }[];
-// };
+import EmojiPicker from "emoji-picker-react";
+import toast from "react-hot-toast";
+import LikeListModal from "../../components/Post/LikeListModal";
 
 const PostInfo = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,24 +22,84 @@ const PostInfo = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [likeUsers, setLikeUsers] = useState([]);
+  const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const currentUserId = localStorage.getItem("userId");
+  const navigate = useNavigate();
 
+  const fetchPost = async () => {
+    try {
+      const res: any = await postApi.getPostById(id!);
+      setPost(res.data);
+      setLikesCount(res.data.likes?.length || 0);
+      setIsLiked(res.data.likes?.includes(currentUserId));
+    } catch (err) {
+      setError("Không lấy được thông tin bài viết.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const fetchPost = async () => {
-        try {
-            const res: any = await postApi.getPostById(id!);
-            console.log("Post detail:", res);
-            setPost(res.data); // ✅ phải lấy từ res.data
-        } catch (err) {
-            setError("Không lấy được thông tin bài viết.");
-        } finally {
-            setLoading(false);
-        }
-    };
+  const fetchLikes = async () => {
+    try {
+      const res = await postApi.getPostLikes(post._id);
+      setLikeUsers(res.data);
+      setIsLikeModalOpen(true);
+    } catch (err) {
+      toast.error("Không thể tải danh sách lượt thích.");
+    }
+  };
 
+  const toggleLike = async () => {
+    try {
+      const res: any = await postApi.toggleLike({ postId: post._id });
+      if (res?.message === "Like") {
+        setIsLiked(true);
+      } else {
+        setIsLiked(false);
+      }
+      setLikesCount(res?.totalLikes || 0);
+    } catch (err) {
+      toast.error("Không thể thích/bỏ thích bài viết.");
+    }
+  };
+
+  const onEmojiClick = (emojiObject: any) => {
+    const { emoji } = emojiObject;
+    const start = newComment.substring(0, cursorPosition || 0);
+    const end = newComment.substring(cursorPosition || 0);
+    const newValue = start + emoji + end;
+    setNewComment(newValue);
+    setCursorPosition((start + emoji).length);
+    setShowEmojiPicker(false);
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(newValue.length, newValue.length);
+    }, 0);
+  };
 
   useEffect(() => {
     fetchPost();
   }, [id]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target as Node)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   if (loading) {
     return (
@@ -53,70 +115,83 @@ const PostInfo = () => {
       </div>
     );
   }
-  console.log("post", post);
-  
 
   return (
     <Wrapper>
-      <div className="left">
-        <img src={post.photoUrls[0]?.url} alt="Post" />
-      </div>
-      <div className="right">
-        {/* Header */}
-        <div className="header">
-          <Avatar
-            src={post.userId.avatar}
-            icon={<UserOutlined />}
-            size={48}
-          />
-          <div className="user-info">
-            <div className="username">{post.userId.username}</div>
-            {post.location && (
-              <div className="location">{post.location}</div>
-            )}
-          </div>
+      <div className="flex flex-row">
+        <div className="left">
+          <img src={post.photoUrls[0]?.url} alt="Post" />
         </div>
+        <div className="right">
+          <div className="header">
+            <Avatar src={post.userId.avatar} icon={<UserOutlined />} size={48} />
+            <div className="user-info">
+              <div className="username cursor-pointer" onClick={() => navigate(`/profile/${post.userId._id}`)}>{post.userId.username}</div>
+              {post.location && <div className="location">{post.location}</div>}
+            </div>
+          </div>
 
-        {/* Caption */}
-        {post.content && (
+          <div className="interactions">
+            {isLiked ? (
+              <HeartFilled style={{ fontSize: 26, color: "#ff4d4f" }} onClick={toggleLike} />
+            ) : (
+              <HeartOutlined style={{ fontSize: 26 }} onClick={toggleLike} />
+            )}
+            <MessageOutlined
+              style={{ fontSize: 26, marginLeft: 12, cursor: "pointer" }}
+              onClick={() => {
+                inputRef.current?.focus();
+                inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            />
+            <SmileOutlined
+              style={{ fontSize: 26, marginLeft: 12, cursor: "pointer" }}
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+            />
+          </div>
+
+          <div
+            className="likes cursor-pointer text-sm"
+            onClick={fetchLikes}
+          >
+            {likesCount} lượt thích
+          </div>
+
           <div className="caption">
-            <span className="font-semibold mr-2">
-              {post.userId.username}
-            </span>
+            <span className="font-semibold mr-2">{post.userId.username}</span>
             {post.content}
           </div>
-        )}
 
-        {/* Comment list */}
-        {/* <div className="comments">
-          {(post.comments || []).map((c) => (
-            <Comment
-              key={c._id}
-              author={c.user.username}
-              avatar={c.user.avatar}
-              content={c.text}
+          <div className="text-xs text-gray-400 mt-1">
+            {moment(post.createdAt).format("DD/MM/YYYY HH:mm")}
+          </div>
+
+          <div className="add-comment mt-4 flex items-center gap-2">
+            <Input
+              ref={inputRef}
+              placeholder="Thêm bình luận..."
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onClick={() =>
+                setCursorPosition(inputRef.current?.selectionStart || 0)
+              }
             />
-          ))}
-        </div> */}
+            <Button type="primary" disabled={!newComment.trim()}>
+              Đăng
+            </Button>
+          </div>
 
-        {/* Add comment */}
-        <div className="add-comment">
-          <Input
-            placeholder="Thêm bình luận..."
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            onPressEnter={() => {
-            }}
+          {showEmojiPicker && (
+            <div ref={emojiPickerRef} className="absolute z-50 mt-2">
+              <EmojiPicker onEmojiClick={onEmojiClick} />
+            </div>
+          )}
+
+          <LikeListModal
+            open={isLikeModalOpen}
+            onClose={() => setIsLikeModalOpen(false)}
+            users={likeUsers}
           />
-          <Button
-            type="primary"
-            disabled={!newComment.trim()}
-            className="ml-2"
-            onClick={() => {
-            }}
-          >
-            Đăng
-          </Button>
         </div>
       </div>
     </Wrapper>
@@ -126,13 +201,14 @@ const PostInfo = () => {
 export default PostInfo;
 
 const Wrapper = styled.div`
-  max-width: 1000px;
-  margin: 2rem auto;
-  display: flex;
   background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  overflow: hidden;
+  max-height: 100vh;
+  max-width: 80%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  place-self: anchor-center;
+  padding-top: 50px;
 
   .left {
     flex: 1;
@@ -149,51 +225,50 @@ const Wrapper = styled.div`
     display: flex;
     flex-direction: column;
     padding: 1rem;
+    position: relative;
+  }
 
-    .header {
-      display: flex;
-      align-items: center;
-      border-bottom: 1px solid #eaeaea;
-      padding-bottom: 0.5rem;
-      margin-bottom: 0.5rem;
+  .header {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #eaeaea;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
 
-      .user-info {
-        margin-left: 0.75rem;
+    .user-info {
+      margin-left: 0.75rem;
 
-        .username {
-          font-weight: 600;
-        }
-        .location {
-          font-size: 0.875rem;
-          color: #888;
-        }
+      .username {
+        font-weight: 600;
+      }
+      .location {
+        font-size: 0.875rem;
+        color: #888;
       }
     }
+  }
 
-    .caption {
-      padding: 0.5rem 0;
-      border-bottom: 1px solid #eaeaea;
-      font-size: 0.95rem;
-      color: #333;
-    }
+  .caption {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eaeaea;
+    font-size: 0.95rem;
+    color: #333;
+  }
 
-    .comments {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0.5rem 0;
-    }
+  .interactions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 0.5rem;
+  }
 
-    .add-comment {
-      display: flex;
-      align-items: center;
-      padding-top: 0.5rem;
-      border-top: 1px solid #eaeaea;
-    }
+  .add-comment {
+    border-top: 1px solid #eaeaea;
+    padding-top: 0.5rem;
   }
 
   @media (max-width: 768px) {
     flex-direction: column;
-
     .left,
     .right {
       width: 100%;

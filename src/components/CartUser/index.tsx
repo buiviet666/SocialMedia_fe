@@ -30,7 +30,7 @@ const CartUser = ({
   const [isFollowing, setIsFollowing] = useState<boolean>(dataItem?.isFollowing || false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const currentUserId = localStorage.getItem('userId');
+  const currentUserId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
 
   const handleFollowToggle = async () => {
     if (!dataItem?._id) return;

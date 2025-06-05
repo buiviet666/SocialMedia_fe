@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState } from "react";
 import styled, { keyframes } from "styled-components";
 import Slider from "react-slick";
@@ -160,7 +161,7 @@ const Post = ({ data }: Props) => {
 
       setLikesCount(res?.totalLikes || 0);
     } catch (err) {
-      message.error("Không thể thực hiện thích/bỏ thích.");
+      toast.error("Không thể thực hiện thích/bỏ thích.");
       console.log("err", err);
     } finally {
       setIsLiking(false);
@@ -175,13 +176,13 @@ const Post = ({ data }: Props) => {
 
       if (res?.message === "Save") {
         setIsSaved(true);
-        message.success("Đã lưu bài viết.");
+        toast.success("Đã lưu bài viết.");
       } else if (res?.message === "unSave") {
         setIsSaved(false);
-        message.info("Đã bỏ lưu bài viết.");
+        toast.success("Đã bỏ lưu bài viết.");
       }
     } catch (err) {
-      message.error("Không thể lưu bài viết.");
+      toast.error("Không thể lưu bài viết.");
       console.error(err);
     } finally {
       setIsSaving(false);
@@ -330,7 +331,13 @@ const Post = ({ data }: Props) => {
                 style={{ fontSize: "26px", padding: "7px" }}
               />
             )}
-            <CommentOutlined style={{ fontSize: "26px", padding: "7px" }} />
+            <CommentOutlined
+              style={{ fontSize: "26px", padding: "7px", cursor: "pointer" }}
+              onClick={() => {
+                inputRef.current?.focus();
+                inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            />
             <SendOutlined style={{ fontSize: "26px", padding: "7px" }} onClick={() => setIsShareOpen(true)}/>
           </div>
           <div className="cartpost_title-save">

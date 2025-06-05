@@ -37,7 +37,6 @@ const Login = () => {
     try {
       const res: any = await authApi.loginApi(val);
       if (res?.statusCode === 200) {
-        console.log("res", res);
         
         const { accessToken, refreshToken } = res.data;
         if (val.rememberLogin) {
@@ -47,7 +46,7 @@ const Login = () => {
         } else {
           sessionStorage.setItem(ACCESS_TOKEN, accessToken);
           sessionStorage.setItem(REFRESH_TOKEN, refreshToken);
-          localStorage.setItem("userId", res?.data?.user?._id)
+          sessionStorage.setItem("userId", res?.data?.user?._id)
         }
 
         navigate("/");

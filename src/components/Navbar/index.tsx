@@ -273,6 +273,7 @@ console.log("selectedFriends", selectedFriends);
         onClose={() => setOpen(false)}
         open={open}
         key={"left"}
+        className="customDrawer"
       >
         {renderComponent.componentPage}
       </Drawer>
@@ -461,5 +462,9 @@ const StyleMainNavbarPC = styled.div`
 
   .ant-popover {
     left: 85px !important;
+  }
+
+  .customDrawer .ant-drawer-body {
+    padding: 0 !important;
   }
 `;

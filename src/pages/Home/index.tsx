@@ -11,15 +11,9 @@ import postApi from "../../apis/api/postApi";
 
 export default function Home() {
   const cartPostRef = useRef<HTMLDivElement>(null!);
-  const [filterLabel, setFilterLabel] = useState("Dành cho bạn");
   const [loading, setLoading] = useState(false);
   const { events } = useDraggable(cartPostRef);
   const [data, setData] = useState<any[]>([]);
-  const currentUserId = localStorage.getItem("userId");
-  const [isLiking, setIsLiking] = useState(false);
-  const [isLiked, setIsLiked] = useState<boolean>(false);
-  const [animateLike, setAnimateLike] = useState(false);
-  const [likesCount, setLikesCount] = useState<number>(0);
   
   
   // console.log("isLiked", isLiked);
@@ -55,8 +49,7 @@ export default function Home() {
     setLoading(false);
   }, []);
 
-  const handleFilterChange = (key: string, label: string) => {
-    setFilterLabel(label);
+  const handleFilterChange = (key: string) => {
     loadDataByFilter(key);
   };
 
