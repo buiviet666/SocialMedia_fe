@@ -26,6 +26,10 @@ import UserManagementPage from "../pages/Admin/UserManagementPage";
 import PostManagementPage from "../pages/Admin/PostManagementPage";
 import RolePage from "../pages/Admin/RolePage";
 import VerifyEmail from "../pages/VerifyEmail";
+import ReportMessagePage from "../pages/Admin/ReportMessagePage";
+import RedirectIfAdmin from "./RedirectIfAdmin";
+import ProfileAdmin from "../pages/Admin/ProfileAdmin";
+import ChangePasswordPage from "../pages/Admin/ChangePasswordPage";
 
 const RoutesList = createBrowserRouter([
   {
@@ -58,25 +62,28 @@ const RoutesList = createBrowserRouter([
   },
   {
     path: "/admin/login",
-    element: <AdminLogin />,
+    element: <RedirectIfAdmin>
+      <AdminLogin />
+    </RedirectIfAdmin>,
   },
   {
     path: "/admin",
     element: (
-      // <ProtectedAdminRoute>
+      <ProtectedAdminRoute>
         <AdminLayout />
-      // </ProtectedAdminRoute>
+      </ProtectedAdminRoute>
     ),
     children: [
       { index: true, element: <AdminPage /> },
-      { path: "report-accounts", element: <ReportAccountPage /> },
-      { path: "report-posts", element: <ReportPostPage /> },
       { path: "report-users", element: <ReportUserPage /> },
+      { path: "report-posts", element: <ReportPostPage /> },
       { path: "report-comments", element: <ReportCommentPage /> },
-      { path: "statistics", element: <StatisticsPage /> },
+      { path: "report-messages", element: <ReportMessagePage /> },
       { path: "users", element: <UserManagementPage /> },
       { path: "posts", element: <PostManagementPage /> },
-      { path: "roles", element: <RolePage /> },
+      { path: "statistics", element: <StatisticsPage /> },
+      { path: "profile", element: <ProfileAdmin /> },
+      { path: "change-password", element: <ChangePasswordPage /> },
     ]
   },
 ]);

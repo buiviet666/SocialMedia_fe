@@ -10,6 +10,7 @@ import userApi from "../../apis/api/userApi";
 import toast from "react-hot-toast";
 import imgNotFound from "../../assets/notFound.svg";
 import EmptyTab from "./TabContentProfile/EmtyTab";
+import reportApi from "../../apis/api/reportApi";
 
 const Profile = () => {
   const { id } = useParams();
@@ -25,6 +26,9 @@ const Profile = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [followList, setFollowList] = useState<any[]>([]);
+
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
 
 
   const navigate = useNavigate();
@@ -142,6 +146,25 @@ const Profile = () => {
     }
   };
 
+  const handleReportUser = async () => {
+    try {
+      if (!reportReason.trim()) {
+        return message.warning("Vui lòng nhập lý do báo cáo");
+      }
+
+      await reportApi.reportUser({ targetUserId: id!, reason: reportReason });
+      message.success("Đã gửi báo cáo người dùng");
+      setIsReportModalOpen(false);
+      setReportReason("");
+    } catch (error: any) {
+      if (error?.response?.status === 409) {
+        message.warning("Bạn đã báo cáo người dùng này trước đó");
+      } else {
+        message.error("Báo cáo thất bại");
+      }
+    }
+  };
+
   useEffect(() => {
     const fetchAll = async () => {
       try {
@@ -220,7 +243,7 @@ const Profile = () => {
                       ],
                       onClick: ({ key }) => {
                         if (key === "block") handleToggleBlock(id!, isBlocked);
-                        else if (key === "report") message.info("Chức năng báo cáo đang phát triển");
+                        else if (key === "report") setIsReportModalOpen(true);
                       },
                     }}
                   >
@@ -315,6 +338,22 @@ const Profile = () => {
             })
           )}
         </div>
+      </Modal>
+      <Modal
+        open={isReportModalOpen}
+        onCancel={() => setIsReportModalOpen(false)}
+        onOk={handleReportUser}
+        okText="Gửi báo cáo"
+        cancelText="Hủy"
+        title="Báo cáo người dùng"
+        centered
+      >
+        <textarea
+          value={reportReason}
+          onChange={(e) => setReportReason(e.target.value)}
+          placeholder="Nhập lý do báo cáo..."
+          className="w-full border border-gray-300 rounded-lg p-2 min-h-[100px] outline-none focus:ring focus:ring-blue-200"
+        />
       </Modal>
     </StyleProfile>
   );

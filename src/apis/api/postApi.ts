@@ -28,6 +28,17 @@ const postApi = {
   getPostsByUserId: (userId: string) => axiosClient.get(`/posts/user/${userId}`),
   getPostLikes: (postId: string) => axiosClient.get(`/posts/${postId}/likes`),
 
+  getCommentsByPost: (postId: string) => axiosClient.get(`/comments/post/${postId}`),
+  getRepliesByCommentId: (commentId: string) => axiosClient.get(`/comments/${commentId}/replies`),
+  createComment: (body: {
+    postId: string;
+    content: string;
+    parentCommentId?: string;
+  }) => axiosClient.post("/comments", body),
+  updateComment: (commentId: string, body: { content: string }) => axiosClient.put(`/comments/${commentId}`, body),
+  deleteComment: (commentId: string) => axiosClient.delete(`/comments/${commentId}`),
+  reportComment: (commentId: string, reason: string) => axiosClient.post("/reports/comment", { commentId, reason }),
+  toggleLikeComment: (commentId: string) => axiosClient.post(`/comments/${commentId}/like`),
 }
 
 export default postApi;

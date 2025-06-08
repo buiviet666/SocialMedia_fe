@@ -1,109 +1,170 @@
-import React from "react";
-import { Button, Form, Input, Typography } from "antd";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useNavigate } from "react-router-dom";
+import { Controller, useForm } from "react-hook-form";
+import styled from "styled-components";
+import { Button, Divider, Input, Switch } from "antd";
+import logo from "../../assets/images/logoMain.png";
+import { useState } from "react";
 import toast from "react-hot-toast";
+import authApi from "../../apis/api/authApi";
+import { ACCESS_TOKEN, REFRESH_TOKEN } from "../../constants";
+import { ValidateMessage } from "../../utils/validateMessage";
 
-const { Title } = Typography;
+interface AdminLoginForm {
+  identifier: string;
+  password: string;
+  rememberLogin: boolean;
+}
 
 const AdminLogin = () => {
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const onFinish = (values: any) => {
-    const { username, password } = values;
+  const { control, handleSubmit } = useForm<AdminLoginForm>({
+    defaultValues: {
+      identifier: "",
+      password: "",
+      rememberLogin: false,
+    },
+    mode: "onBlur",
+    reValidateMode: "onChange",
+  });
 
-    if (username === "admin" && password === "admin123") {
-      localStorage.setItem("user", JSON.stringify({ username, role: "admin" }));
-      localStorage.setItem("accessToken", "admin-access-token");
+  const _onSubmit = async (val: AdminLoginForm) => {
+    setLoading(true);
+    try {
+      const res: any = await authApi.loginApi(val);
+      const { accessToken, refreshToken, user } = res.data;
 
-      toast.success("Admin login successful!");
+      if (user.role !== "ADMIN") {
+        toast.error("Bạn không có quyền truy cập hệ thống quản trị.");
+        return;
+      }
+
+      if (val.rememberLogin) {
+        localStorage.setItem(ACCESS_TOKEN, accessToken);
+        localStorage.setItem(REFRESH_TOKEN, refreshToken);
+        localStorage.setItem("userId", user._id);
+        localStorage.setItem("user", JSON.stringify(user));
+      } else {
+        sessionStorage.setItem(ACCESS_TOKEN, accessToken);
+        sessionStorage.setItem(REFRESH_TOKEN, refreshToken);
+        sessionStorage.setItem("userId", user._id);
+        sessionStorage.setItem("user", JSON.stringify(user));
+      }
+
+      toast.success("Đăng nhập quản trị thành công!");
       navigate("/admin");
-    } else {
-      toast.error("Invalid admin credentials!");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Đăng nhập thất bại!");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.background} />
-      <div style={styles.formWrapper}>
-        <div style={styles.formBox}>
-          <Title level={3} style={{ textAlign: "center", color: "#fff" }}>
-            Admin Login
-          </Title>
-          <Form layout="vertical" onFinish={onFinish}>
-            <Form.Item
-              label={<span style={{ color: "#fff" }}>Username</span>}
-              name="username"
-              rules={[{ required: true, message: "Vui lòng nhập tên đăng nhập" }]}
-            >
-              <Input size="large" placeholder="Nhập tên đăng nhập" />
-            </Form.Item>
-
-            <Form.Item
-              label={<span style={{ color: "#fff" }}>Password</span>}
-              name="password"
-              rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
-            >
-              <Input.Password size="large" placeholder="Nhập mật khẩu" />
-            </Form.Item>
-
-            <Form.Item>
-              <Button type="primary" htmlType="submit" size="large" block>
-                Đăng nhập
-              </Button>
-            </Form.Item>
-          </Form>
+    <StyleLogin className="flex justify-center items-center h-screen px-4">
+      <div className="w-full max-w-[400px] p-6 rounded-xl shadow-xl bg-white">
+        <div className="text-center mb-8">
+          <img src={logo} alt="logo" className="mx-auto w-[200px]" />
+          <h2 className="text-2xl font-semibold mt-4">Admin Login</h2>
         </div>
+        <form onSubmit={handleSubmit(_onSubmit)}>
+          <Controller
+            name="identifier"
+            control={control}
+            rules={{ required: "Username or Email is required" }}
+            render={({ field, fieldState }) => (
+              <FormItem>
+                <label htmlFor="identifier" className="required">
+                  Username or Email
+                </label>
+                <Input
+                  {...field}
+                  id="identifier"
+                  maxLength={255}
+                  status={fieldState.invalid ? "error" : ""}
+                  placeholder="Enter Username or Email"
+                />
+                <ValidateMessage message={fieldState.error?.message} />
+              </FormItem>
+            )}
+          />
+
+          <Controller
+            name="password"
+            control={control}
+            rules={{
+              required: "Password is required",
+              minLength: { value: 6, message: "Minimum 6 characters" },
+            }}
+            render={({ field, fieldState }) => (
+              <FormItem>
+                <label htmlFor="password" className="required">
+                  Password
+                </label>
+                <Input.Password
+                  {...field}
+                  id="password"
+                  maxLength={255}
+                  status={fieldState.invalid ? "error" : ""}
+                  placeholder="Enter Password"
+                />
+                <ValidateMessage message={fieldState.error?.message} />
+              </FormItem>
+            )}
+          />
+
+          <Controller
+            name="rememberLogin"
+            control={control}
+            render={({ field }) => (
+              <div className="flex items-center mb-4">
+                <Switch checked={field.value} onChange={field.onChange} />
+                <span className="ml-2">Remember me</span>
+              </div>
+            )}
+          />
+
+          <Button
+            htmlType="submit"
+            className="w-full button-custom"
+            type="primary"
+            loading={loading}
+          >
+            Sign in as Admin
+          </Button>
+          <Divider />
+        </form>
       </div>
-    </div>
+    </StyleLogin>
   );
 };
 
-// Styles
-const styles: { [key: string]: React.CSSProperties } = {
-  container: {
-    position: "relative",
-    height: "100vh",
-    overflow: "hidden",
-  },
-  background: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    background: "linear-gradient(-45deg, #4158D0, #C850C0, #FFCC70, #009688)",
-    backgroundSize: "400% 400%",
-    animation: "gradientBG 20s ease infinite",
-    zIndex: 1,
-  },
-  formWrapper: {
-    position: "relative",
-    zIndex: 2,
-    width: "100%",
-    height: "100%",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    backdropFilter: "blur(4px)",
-  },
-  formBox: {
-    width: "100%",
-    maxWidth: 400,
-    padding: 32,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    borderRadius: 16,
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-  },
-};
-
-// Add keyframe animation for background
-const styleSheet = document.createElement("style");
-styleSheet.innerHTML = `
-@keyframes gradientBG {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-`;
-document.head.appendChild(styleSheet);
-
 export default AdminLogin;
+
+const StyleLogin = styled.div`
+  .button-custom {
+    height: 40px;
+    font-weight: 500;
+    font-size: 14px;
+    span {
+      color: #fff;
+    }
+  }
+`;
+
+const FormItem = styled.div`
+  margin-bottom: 16px;
+
+  .ant-input {
+    margin-top: 8px;
+    min-height: 48px;
+    padding: 14px 16px;
+  }
+
+  label {
+    font-size: 14px;
+    padding-left: 4px;
+  }
+`;

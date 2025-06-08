@@ -40,7 +40,7 @@ const Post = ({ data }: Props) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
-  const currentUserId = localStorage.getItem("userId");
+  const currentUserId = sessionStorage.getItem("userId") || localStorage.getItem("userId");
   const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState<boolean>(false);
   const [likesCount, setLikesCount] = useState<number>(data?.likes?.length || 0);
@@ -196,6 +196,7 @@ const Post = ({ data }: Props) => {
       toast.success("Chia sẻ bài viết thành công!");
     } catch (err) {
       toast.error("Không thể chia sẻ bài viết.");
+      console.log(err);
     } finally {
       setIsShareOpen(false);
     }
@@ -216,7 +217,7 @@ const Post = ({ data }: Props) => {
   const handleReportPost = async (reason: string) => {
     try {
       await postApi.reportPost({
-        postId: data.userId._id,
+        postId: data._id,
         reason,
       });
       message.success("Đã gửi báo cáo.");

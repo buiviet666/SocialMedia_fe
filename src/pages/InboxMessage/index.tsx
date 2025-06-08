@@ -8,14 +8,16 @@ import { Avatar, Dropdown, Input, List, MenuProps, Modal, Tooltip } from "antd";
 import toast from "react-hot-toast";
 import messageApi from "../../apis/api/messageApi";
 import socket from "../../utils/socket";
-import { MdOutlineMoreVert } from "react-icons/md";
+import { MdClose, MdOutlineMoreVert } from "react-icons/md";
+import { FaCheck } from "react-icons/fa";
+import MessageList from "../../components/MessageList";
 
 const InboxMessage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const currentUserId = sessionStorage.getItem("userId") || localStorage.getItem("userId");
+  const currentUserId = sessionStorage.getItem("userId") || localStorage.getItem("userId") || '';
   const [dataCurrent, setDataCurrent] = useState<any>(null);
   const [dataListFriend, setDataListFriend] = useState<any[]>([]);
   const [dataConversation, setDataConversation] = useState<any[]>([]);
@@ -108,10 +110,9 @@ const InboxMessage = () => {
   
   
 
-  const handleDeleteConversation = async () => {
-    const getIdConversation: any = id;
+  const handleDeleteConversation = async (data: any) => {
     try {
-      const res: any = await conversationApi.deleteConversation(getIdConversation);
+      const res: any = await conversationApi.deleteConversation(data._id);
 
       if (res?.statusCode === 200) {
         toast.success(res?.message || "Delete success!");
@@ -152,15 +153,24 @@ const InboxMessage = () => {
   };
 
 
-  const handleReceiveMessage = (message: any) => {
+  const handleReceiveMessage = async (message: any) => {
     const conversationId = message.conversationId._id || message.conversationId;
 
-    // Cập nhật nếu đang mở đúng hội thoại
+    // Nếu đang mở đúng hội thoại
     if (selected?._id === conversationId) {
       setSelected((prev: any) => ({
         ...prev,
         messages: [...(prev?.messages || []), message],
       }));
+
+      try {
+        // Nếu chưa đánh dấu đã nhận
+        if (!message.deliveredTo?.includes(currentUserId)) {
+          await messageApi.markAsDelivered(message._id);
+        }
+      } catch (err) {
+        console.error("Lỗi markAsDelivered:", err);
+      }
     }
 
     // Cập nhật lastMessage trong danh sách hội thoại
@@ -171,6 +181,39 @@ const InboxMessage = () => {
           : conv
       )
     );
+  };
+
+  const markMessagesAsDeliveredAndRead = async (messages: any[]) => {
+    const deliveredIds: string[] = [];
+    const readIds: string[] = [];
+
+    messages.forEach((msg) => {
+      const senderId = msg.senderId?._id || msg.senderId;
+      if (senderId !== currentUserId) {
+        if (!msg.deliveredTo?.includes(currentUserId)) deliveredIds.push(msg._id);
+        if (!msg.seenBy?.includes(currentUserId)) readIds.push(msg._id);
+      }
+    });
+
+    try {
+      if (deliveredIds.length > 0) {
+        await messageApi.markDeliveredBulk({ messageIds: deliveredIds });
+        socket.emit("messages_delivered", {
+          messageIds: deliveredIds,
+          deliveredBy: currentUserId,
+        });
+      }
+
+      if (readIds.length > 0) {
+        await messageApi.markReadBulk({ messageIds: readIds });
+        socket.emit("messages_read", {
+          messageIds: readIds,
+          readBy: currentUserId,
+        });
+      }
+    } catch (err) {
+      console.error("❌ Lỗi khi đánh dấu đã nhận/đọc:", err);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -227,6 +270,7 @@ const InboxMessage = () => {
         if (existing) {
           const messagesRes = await messageApi.getMessagesByConversation(existing._id);
           setSelected({ ...existing, messages: messagesRes.data });
+          await markMessagesAsDeliveredAndRead(messagesRes.data);
           navigate(`/inbox/${existing._id}`);
         } else {
           // Hiển thị giao diện trò chuyện với bạn (chưa từng nhắn tin)
@@ -293,6 +337,7 @@ const InboxMessage = () => {
       if (foundConv) {
         const messagesRes = await messageApi.getMessagesByConversation(id);
         setSelected({ ...foundConv, messages: messagesRes.data });
+        await markMessagesAsDeliveredAndRead(messagesRes.data);
       }
     };
     openById();
@@ -310,14 +355,10 @@ const InboxMessage = () => {
     return fallback;
   };
 
-  const items: MenuProps["items"] = [
-    {label: "Delete", key: "delete"}
-  ]
-
-  const handleClick: MenuProps["onClick"] = ({key}) => {
+  const handleClick = (key: string, conversation: any) => {
     switch (key) {
       case "delete":
-        handleDeleteConversation();
+        handleDeleteConversation(conversation);
         break;
       default:
         break;
@@ -386,15 +427,59 @@ const InboxMessage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const handleDelivered = ({ messageIds, deliveredBy }: any) => {
+      setSelected((prev: any) => ({
+        ...prev,
+        messages: prev.messages.map((msg: any) =>
+          messageIds.includes(msg._id)
+            ? {
+                ...msg,
+                deliveredTo: [...new Set([...(msg.deliveredTo || []), deliveredBy])],
+              }
+            : msg
+        ),
+      }));
+    };
+
+    const handleRead = ({ messageIds, readBy }: any) => {
+      setSelected((prev: any) => ({
+        ...prev,
+        messages: prev.messages.map((msg: any) =>
+          messageIds.includes(msg._id)
+            ? {
+                ...msg,
+                seenBy: [...new Set([...(msg.seenBy || []), readBy])],
+              }
+            : msg
+        ),
+      }));
+    };
+
+    socket.on("messages_delivered", handleDelivered);
+    socket.on("messages_read", handleRead);
+
+    return () => {
+      socket.off("messages_delivered", handleDelivered);
+      socket.off("messages_read", handleRead);
+    };
+  }, []);
+
 
   if (loading) return <div>Đang tải dữ liệu...</div>;
   
   return (
     <StyleInboxMessage>
       <div className="sidebar">
-        <div onClick={() => navigate('/profile')} className="text-[21px] cursor-pointer inline-block hover:underline">
-          <b>{dataCurrent?.nameDisplay || dataCurrent?.userName || ''}</b>
-        </div>
+        <Tooltip
+          placement="top"
+          title={dataCurrent?.nameDisplay || dataCurrent?.userName || ''}
+          arrow
+        >
+          <div onClick={() => navigate('/profile')} className="titleNameCustom text-[21px] cursor-pointer inline-block hover:underline">
+            <b>{dataCurrent?.nameDisplay || dataCurrent?.userName || ''}</b>
+          </div>
+        </Tooltip>
 
         <div className="friend-list">
           {dataListFriend.length === 0 ? (
@@ -466,7 +551,11 @@ const InboxMessage = () => {
                   </div>
 
                   <Dropdown
-                    menu={{ items, onClick: handleClick }}
+                    menu={{ 
+                      items: [
+                        {label: "Delete", key: "delete"}
+                      ],
+                      onClick: ({key}) => handleClick(key, conversation) }}
                     trigger={["click"]}
                     placement="bottomLeft"
                   >
@@ -497,74 +586,18 @@ const InboxMessage = () => {
             </div>
 
             <div className="chat-body" ref={chatRef}>
-              {selected.messages?.map((msg: any) => {
-                const isMe = msg.senderId?._id === currentUserId || msg.senderId === currentUserId;
-                const time = new Date(msg.createdAt).toLocaleTimeString("vi-VN", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-
-                return (
-                  <div key={msg._id} className={`chat-message-wrapper ${isMe ? "me" : "other"}`}>
-                    {/* Dropdown 3 chấm bên trái nếu là mình */}
-                    {isMe && (
-                      <Dropdown
-                        menu={createMessageMenu(msg)}
-                        trigger={["click"]}
-                        placement="bottomLeft"
-                      >
-                        <MdOutlineMoreVert style={{ cursor: "pointer", marginRight: 8 }} />
-                      </Dropdown>
-                    )}
-
-                    {/* Nội dung tin nhắn */}
-                    <div className={`chat-message ${isMe ? "me" : "other"}`}>
-                      
-                      {editingMessageId === msg._id ? (
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                          <input
-                            value={editingValue}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            style={{ padding: 4, borderRadius: 4, border: "1px solid #ccc" }}
-                          />
-                          <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
-                            <button
-                              style={{ background: "#4caf50", color: "white", border: "none", padding: "4px 10px", borderRadius: 4 }}
-                              onClick={() => handleUpdateMessage(msg._id)}
-                            >
-                              ✅
-                            </button>
-                            <button
-                              style={{ background: "#f44336", color: "white", border: "none", padding: "4px 10px", borderRadius: 4 }}
-                              onClick={() => setEditingMessageId(null)}
-                            >
-                              ❌
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <div>{msg.content}</div>
-                          {msg.status === 'EDITED' && <span style={{ fontSize: 11, color: '#888', marginLeft: 4 }}>(đã sửa)</span>}
-                        </div>
-                      )}
-
-                      <div className="message-time">{time}</div>
-                    </div>
-
-                    {/* Dropdown 3 chấm bên phải nếu là người khác */}
-                    {!isMe && (
-                      <Dropdown
-                        menu={createMessageMenu(msg)}
-                        trigger={["click"]}
-                        placement="bottomLeft"
-                      >
-                        <MdOutlineMoreVert style={{ cursor: "pointer", marginLeft: 8 }} />
-                      </Dropdown>
-                    )}
-                  </div>
-                );
-              })}
+              <div className="chat-body" ref={chatRef}>
+                <MessageList
+                  currentUserId={currentUserId}
+                  messages={selected.messages}
+                  editingMessageId={editingMessageId}
+                  editingValue={editingValue}
+                  onEditChange={setEditingValue}
+                  onEditSubmit={handleUpdateMessage}
+                  onEditCancel={() => setEditingMessageId(null)}
+                  createMessageMenu={createMessageMenu}
+                />
+              </div>
             </div>
             <div className="chat-input">
               <input
@@ -835,4 +868,9 @@ const StyleInboxMessage = styled.div`
     background-color: #9e9e9e; /* xám */
   }
 
+  .titleNameCustom {
+    overflow: hidden;
+    width: 100%;
+    text-overflow: ellipsis;
+  }
 `

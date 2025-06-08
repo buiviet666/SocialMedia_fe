@@ -213,12 +213,12 @@ console.log("selectedFriends", selectedFriends);
       component: <Message onClose={() => setOpen(false)}/>,
       title: "Nhắn tin",
     },
-    {
-      icon: <BellOutlined />,
-      path: "",
-      component: <Notify />,
-      title: "Thông báo",
-    },
+    // {
+    //   icon: <BellOutlined />,
+    //   path: "",
+    //   component: <Notify />,
+    //   title: "Thông báo",
+    // },
     {
       icon: <PlusOutlined />,
       popup: true,
@@ -464,7 +464,4 @@ const StyleMainNavbarPC = styled.div`
     left: 85px !important;
   }
 
-  .customDrawer .ant-drawer-body {
-    padding: 0 !important;
-  }
 `;

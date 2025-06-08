@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState, useRef } from "react";
 import styled from "styled-components";
-import { Input, Avatar, List, Button, Tooltip, InputRef } from "antd";
+import { Input, Avatar, List, Button, Tooltip, InputRef, Dropdown, MenuProps } from "antd";
 import { SendOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import userApi from "../../apis/api/userApi";
@@ -9,6 +9,7 @@ import conversationApi from "../../apis/api/conversation";
 import messageApi from "../../apis/api/messageApi";
 import toast from "react-hot-toast";
 import socket from "../../utils/socket";
+import { MdOutlineMoreVert } from "react-icons/md";
 
 type MessageProps = {
   onClose?: () => void;
@@ -16,7 +17,7 @@ type MessageProps = {
 
 const Message = ({ onClose }: MessageProps) => {
   const inputRef = useRef<InputRef>(null);
-  const [friends, setFriends] = useState([]);
+  const [friends, setFriends] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [input, setInput] = useState("");
@@ -171,6 +172,58 @@ const Message = ({ onClose }: MessageProps) => {
     onClose?.();
   };
 
+  const handleDeleteConversation = async (data: any) => {
+    try {
+      const res: any = await conversationApi.deleteConversation(data._id);
+
+      if (res?.statusCode === 200) {
+        toast.success(res?.message || "Delete success!");
+      } else {
+        toast.error(res?.message || "Error!")
+      }
+    } catch (error) {
+      console.log(error);
+      toast.error("Error server!")
+    }
+  }
+
+  const handleClick = (key: string, conversation: any) => {
+    switch (key) {
+      case "delete":
+        handleDeleteConversation(conversation);
+        break;
+      default:
+        break;
+    }
+  }
+
+  // 👇 Lắng nghe trạng thái online/offline realtime
+  useEffect(() => {
+    const handleOnlineStatus = ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
+      setFriends((prev) =>
+        prev.map((friend) =>
+          friend._id === userId ? { ...friend, isOnline } : friend
+        )
+      );
+
+      // ✅ Sửa lại từ setDataConversation → setConversations
+      setConversations((prev) =>
+        prev.map((conv) => ({
+          ...conv,
+          participants: conv.participants.map((p: any) =>
+            p._id === userId ? { ...p, isOnline } : p
+          ),
+        }))
+      );
+    };
+
+    socket.on("user_online_status", handleOnlineStatus);
+
+    return () => {
+      socket.off("user_online_status", handleOnlineStatus);
+    };
+  }, []);
+
   return (
     <StyleMessage>
       <div
@@ -203,10 +256,27 @@ const Message = ({ onClose }: MessageProps) => {
               };
 
               return (
-                <div key={friend._id} className="friendItem" onClick={handleClick}>
-                  <Avatar src={friend.avatar} size={50} />
-                  <span>{friend.nameDisplay || friend.userName}</span>
-                </div>
+                // <div key={friend._id} className="friendItem" onClick={handleClick}>
+                //   <Avatar src={friend.avatar} size={50} />
+                //   <span>{friend.nameDisplay || friend.userName}</span>
+                // </div>
+                <Tooltip
+                  placement="top"
+                  title={friend.nameDisplay || friend.userName}
+                  arrow
+                  key={friend._id}
+                >
+                  <div
+                    className="friend-item"
+                    onClick={handleClick}
+                  >
+                    <div className="avatar-wrapper">
+                      <Avatar src={friend.avatar} size={50} />
+                      <span className={`status-indicator ${friend.isOnline ? "online" : "offline"}`} />
+                    </div>
+                    <div>{friend.nameDisplay || friend.userName}</div>
+                  </div>
+                </Tooltip>
               );
             })}
           </div>
@@ -221,16 +291,31 @@ const Message = ({ onClose }: MessageProps) => {
               return (
                 <List.Item
                   key={conversation._id}
-                  onClick={() => openChatWithFriend(conversation)}
-                  style={{ cursor: "pointer" }}
+                  style={{ cursor: "default" }}
+                  className="customCartIb"
                 >
-                  <List.Item.Meta
-                    avatar={<Avatar src={participant.avatar} />}
-                    title={participant.nameDisplay || participant.userName || ""}
-                    description={
-                      conversation.lastMessage?.content || "Tin nhắn gần nhất"
-                    }
-                  />
+                  <div
+                    onClick={() => openChatWithFriend(conversation)}
+                    style={{ flex: 1, cursor: "pointer" }}>
+                    <List.Item.Meta
+                      avatar={<Avatar src={participant.avatar} />}
+                      title={participant.nameDisplay || participant.userName || ""}
+                      description={
+                        conversation.lastMessage?.content || "Tin nhắn gần nhất"
+                      }
+                    />
+                  </div>
+                  <Dropdown
+                    menu={{ 
+                      items: [
+                        {label: "Delete", key: "delete"}
+                      ], 
+                      onClick: ({key}) => handleClick(key, conversation) }}
+                    trigger={["click"]}
+                    placement="bottomLeft"
+                  >
+                    <MdOutlineMoreVert style={{ cursor: "pointer", alignSelf: 'center' }} />
+                  </Dropdown>
                 </List.Item>
               );
             }}
@@ -300,26 +385,47 @@ const StyleMessage = styled.div`
     border-bottom: 1px solid #eee;
   }
 
-  .friendItem {
+  .friend-item {
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    cursor: pointer;
-    width: 72px;
+    width: 70px;
     text-align: center;
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 10px;
+
+  }
+
+  .friend-item:hover {
+    background-color: #f0f0f0;
+    border-radius: 8px;
+  }
+
+  .friend-item div {
+    max-width: 45px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 13px;
-    transition: all 0.3s;
+    margin-top: 6px;
   }
 
-  .friendItem:hover {
-    transform: scale(1.05);
+  .friend-item:hover,
+  .friend-item.active {
+    background-color: #f0f0f0;
   }
 
-  .friendItem span {
-    margin-top: 4px;
-    word-break: break-word;
-    white-space: normal;
-    font-weight: 500;
+  .friend-item img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+  }
+
+  .avatar-wrapper {
+    position: relative;
+    display: inline-block;
   }
 
   .chatHeader {
@@ -392,6 +498,35 @@ const StyleMessage = styled.div`
 
   .ant-list-item:hover {
     background-color: #f7f7f7;
+  }
+
+  .customCartIb {
+    max-width: 300px;
+  }
+
+  .customCartIb .ant-list-item-meta-title,
+  .customCartIb .ant-list-item-meta-description {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-indicator {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+  }
+
+  .status-indicator.online {
+    background-color: #4caf50; /* xanh lá */
+  }
+
+  .status-indicator.offline {
+    background-color: #9e9e9e; /* xám */
   }
 `;
 

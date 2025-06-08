@@ -1,58 +1,75 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Input, Select, Button, Tag, Tooltip, Space, Popconfirm, message } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import AdminTable from "../components/AdminTable";
+import adminApi from "../../../apis/api/adminApi";
 
 const { Option } = Select;
 
-const mockPosts = [
-  {
-    id: 1,
-    author: "john_doe",
-    content: "Hôm nay trời thật đẹp, chia sẻ với mọi người vài hình ảnh",
-    privacy: "public",
-    createdAt: "2025-05-25",
-  },
-  {
-    id: 2,
-    author: "jane_smith",
-    content: "Tâm trạng hôm nay không tốt lắm...",
-    privacy: "private",
-    createdAt: "2025-05-24",
-  },
-  {
-    id: 3,
-    author: "travel_guy",
-    content: "Kinh nghiệm phượt Hà Giang 5 ngày 4 đêm cực chi tiết",
-    privacy: "friends",
-    createdAt: "2025-05-23",
-  },
-];
-
 const privacyColorMap = {
-  public: "green",
-  friends: "blue",
-  private: "orange",
+  PUBLIC: "green",
+  FRIENDS: "blue",
+  PRIVATE: "orange",
+  FRIENDONLY: "purple",
+  EXCEPTFRIEND: "red",
 };
 
 const PostManagementPage = () => {
   const [search, setSearch] = useState("");
   const [privacyFilter, setPrivacyFilter] = useState("all");
-  const [data, setData] = useState(mockPosts);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const handleDelete = (record: any) => {
-    setData((prev) => prev.filter((p) => p.id !== record.id));
-    message.success(`Đã xóa bài viết của ${record.author}`);
+  const fetchPosts = async () => {
+    try {
+      setLoading(true);
+      const res = await adminApi.getAllPosts();
+      setData(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error("Không thể tải danh sách bài viết");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleView = (record: any) => {
-    message.info(`Xem chi tiết bài viết ID: ${record.id}`);
+  const handleSearch = async (keyword) => {
+    try {
+      setLoading(true);
+      if (!keyword.trim()) return fetchPosts();
+      const res = await adminApi.searchPosts(keyword);
+      setData(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error("Không thể tìm kiếm bài viết");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filteredData = data.filter((post) => {
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  // const handleDelete = async (record) => {
+  //   try {
+  //     await adminApi.deletePost(record._id);
+  //     message.success("Đã xóa bài viết");
+  //     fetchPosts();
+  //   } catch (err) {
+  //     message.error("Không thể xóa bài viết");
+  //   }
+  // };
+
+  const handleView = (record) => {
+    message.info(`Xem chi tiết bài viết ID: ${record._id}`);
+  };
+
+  const filteredData = data.filter((post: any) => {
     const matchSearch =
-      post.author.toLowerCase().includes(search.toLowerCase()) ||
-      post.content.toLowerCase().includes(search.toLowerCase());
+      post.userId?.userName?.toLowerCase().includes(search.toLowerCase()) ||
+      post.title?.toLowerCase().includes(search.toLowerCase()) ||
+      post.content?.toLowerCase().includes(search.toLowerCase());
     const matchPrivacy =
       privacyFilter === "all" || post.privacy === privacyFilter;
     return matchSearch && matchPrivacy;
@@ -61,15 +78,16 @@ const PostManagementPage = () => {
   const columns = [
     {
       title: "Người đăng",
-      dataIndex: "author",
+      dataIndex: ["userId", "userName"],
       key: "author",
-      sorter: (a: any, b: any) => a.author.localeCompare(b.author),
+      render: (_, record) => record.userId?.nameDisplay || record.userId?.userName,
+      sorter: (a, b) => a.userId?.userName?.localeCompare(b.userId?.userName),
     },
     {
       title: "Nội dung",
       dataIndex: "content",
       key: "content",
-      render: (text: string) => (
+      render: (text) => (
         <Tooltip title={text}>
           <span style={{ maxWidth: 250, display: "inline-block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{text}</span>
         </Tooltip>
@@ -79,39 +97,34 @@ const PostManagementPage = () => {
       title: "Quyền riêng tư",
       dataIndex: "privacy",
       key: "privacy",
-      sorter: (a: any, b: any) => a.privacy.localeCompare(b.privacy),
-      render: (privacy: string) => (
-        <Tag color={privacyColorMap[privacy]}>{privacy.toUpperCase()}</Tag>
+      sorter: (a, b) => a.privacy.localeCompare(b.privacy),
+      render: (privacy) => (
+        <Tag color={privacyColorMap[privacy]}>{privacy}</Tag>
       ),
     },
     {
       title: "Ngày đăng",
       dataIndex: "createdAt",
       key: "createdAt",
-      sorter: (a: any, b: any) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      sorter: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     },
-    {
-      title: "Hành động",
-      key: "actions",
-      render: (_: any, record: any) => (
-        <Space>
-          <Button size="small" type="link" onClick={() => handleView(record)}>
-            Xem chi tiết
-          </Button>
-          <Popconfirm
-            title="Bạn có chắc muốn xóa bài viết này?"
-            onConfirm={() => handleDelete(record)}
-            okText="Xóa"
-            cancelText="Hủy"
-          >
-            <Button size="small" danger>
-              Xóa
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
+    // {
+    //   title: "Hành động",
+    //   key: "actions",
+    //   render: (_, record) => (
+    //     <Space>
+    //       <Button size="small" type="link" onClick={() => handleView(record)}>Xem chi tiết</Button>
+    //       <Popconfirm
+    //         title="Bạn có chắc muốn xóa bài viết này?"
+    //         onConfirm={() => handleDelete(record)}
+    //         okText="Xóa"
+    //         cancelText="Hủy"
+    //       >
+    //         <Button size="small" danger>Xóa</Button>
+    //       </Popconfirm>
+    //     </Space>
+    //   ),
+    // },
   ];
 
   return (
@@ -123,7 +136,9 @@ const PostManagementPage = () => {
           prefix={<SearchOutlined />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onPressEnter={() => handleSearch(search)}
           style={{ width: 300 }}
+          allowClear
         />
         <Select
           value={privacyFilter}
@@ -131,15 +146,18 @@ const PostManagementPage = () => {
           style={{ width: 200 }}
         >
           <Option value="all">Tất cả quyền riêng tư</Option>
-          <Option value="public">Công khai</Option>
-          <Option value="friends">Bạn bè</Option>
-          <Option value="private">Chỉ mình tôi</Option>
+          <Option value="PUBLIC">Công khai</Option>
+          <Option value="FRIENDS">Bạn bè</Option>
+          <Option value="PRIVATE">Chỉ mình tôi</Option>
+          {/* <Option value="FRIENDONLY">Chỉ một số bạn bè</Option>
+          <Option value="EXCEPTFRIEND">Trừ một số bạn bè</Option> */}
         </Select>
       </Space>
       <AdminTable
         columns={columns}
         data={filteredData}
-        pageSize={5}
+        loading={loading}
+        pageSize={10}
         scrollX={1000}
       />
     </>

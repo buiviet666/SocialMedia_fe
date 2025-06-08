@@ -11,6 +11,7 @@ import postApi from '../../../apis/api/postApi';
 import toast from 'react-hot-toast';
 import SharePost from '../SharePost';
 import LikeListModal from '../LikeListModal';
+import CommentItem from '../CommentItem';
 
 interface InfoPostPopupProps {
   open: boolean;
@@ -33,10 +34,23 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
   const [likeUsers, setLikeUsers] = useState([]);
+  // const [isLikedCmt, setIsLikedCmt] = useState<boolean>(false);
   const currentUserId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
   const navigate = useNavigate();
 
   console.log("data", data);
+  
+  const handleDeleteComment = (commentId: string) => {
+    console.log("Delete", commentId);
+  };
+  const handleReportComment = (commentId: string) => {
+    console.log("Report", commentId);
+  };
+  
+
+
+  const [listComment, setListComment] = useState<any[]>([]);
+
   const handleClickProfile = () => {
     if (currentUserId === data?.user?._id) {
       navigate(`/profile`)
@@ -44,6 +58,64 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
       navigate(`/profile/${data?.user?._id}`)
     }
   }
+
+  const getDataListCmt = async () => {
+    try {
+      const res = await postApi.getCommentsByPost(data._id);
+      setListComment(res?.data)
+      console.log("res", res);
+      
+    } catch (error) {
+      console.log(error);
+      toast.error("error");
+    }
+  }
+
+  
+
+  // console.log("isLikedCmt", isLikedCmt);
+  
+  
+
+  const handleSubmitCmt = async () => {
+    try {
+      const params = {
+        postId: data._id,
+        content: valueInput
+      }
+      const res = await postApi.createComment(params);
+      console.log(res);
+      
+    } catch (error) {
+      console.log(error);
+      toast.error("error");
+    }
+  }
+
+  const handleReply = async (parentId: string, content: string) => {
+    console.log("parentId", parentId);
+    
+    try {
+      const params = {
+        postId: data._id,
+        content: content,
+        parentCommentId: parentId
+      }
+      const res = await postApi.createComment(params);
+      console.log(res);
+      
+    } catch (error) {
+      console.log(error);
+      toast.error("error");
+    }
+  };
+
+  useEffect(() => {
+    getDataListCmt();
+  }, []);
+
+  console.log("listComment", listComment);
+  
 
   const onEmojiClick = (emojiObject: any) => {
     const { emoji } = emojiObject;
@@ -171,7 +243,18 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
 
 
           <div className="caption">
-            <span className="username">{data.name}</span> {data.caption}
+            {listComment.map((comment) => (
+                <CommentItem
+                  key={comment._id}
+                  comment={comment}
+                  currentUserId={currentUserId}
+                  onReply={handleReply}
+                  onDelete={handleDeleteComment}
+                  onReport={handleReportComment}
+                  // onToggleLike={handleToggleLike}
+                  // isLikedCmt={isLikedCmt}
+                />
+              ))}
           </div>
 
           <div className='mt-auto'>
@@ -251,7 +334,7 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
               {valueInput && (
                 <>
                   <CloseOutlined className="text-gray-400 cursor-pointer hover:text-red-500" onClick={deleteInput} />
-                  <span className="font-semibold text-sky-500 hover:opacity-100 opacity-60 cursor-pointer">Đăng</span>
+                  <span className="font-semibold text-sky-500 hover:opacity-100 opacity-60 cursor-pointer" onClick={handleSubmitCmt}>Đăng</span>
                 </>
               )}
               <div className="relative">
@@ -329,15 +412,20 @@ const StyledModal = styled(Modal)`
   }
 
   .caption {
-    margin: 12px 0;
-    max-height: 330px;
-    height: 100%;
-    overflow: scroll;
+    max-height: 350px;
+    overflow-y: auto;
     overflow-x: hidden;
+
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     .username {
       font-weight: bold;
       margin-right: 6px;
     }
+  }
+
+  .caption::-webkit-scrollbar {
+    display: none;
   }
 
   .interactions {
