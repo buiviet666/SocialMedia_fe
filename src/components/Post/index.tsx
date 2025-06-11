@@ -28,12 +28,14 @@ import { Modal } from "antd";
 import EditPostModal from "./EditPostModal";
 import { formatTimeFromNow } from "../../utils/functionCommon";
 import toast from "react-hot-toast";
+import userApi from "../../apis/api/userApi";
 
 interface Props {
   data?: any;
+  infoUser?: any;
 }
 
-const Post = ({ data }: Props) => {
+const Post = ({ data, infoUser }: Props) => {
   const [valueInput, setValueInput] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -54,7 +56,8 @@ const Post = ({ data }: Props) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
   const [likeUsers, setLikeUsers] = useState([]);
-
+  const [listComment, setListComment] = useState<any[]>([]);
+  const [isFollowing, setIsFollowing] = useState<boolean>(infoUser.following.includes(data.userId._id) || false);
 
   const isOwnPost = currentUserId === data?.userId?._id;
 
@@ -62,46 +65,45 @@ const Post = ({ data }: Props) => {
     if (data?.likes && currentUserId) {
       setIsLiked(data.likes.includes(currentUserId));
     }
-  }, [data?.likes, currentUserId]);
+
+    if (infoUser?.savedPosts) {
+      setIsSaved(infoUser?.savedPosts.includes(data._id));
+    }
+  }, [data?.likes, currentUserId, infoUser?.savedPosts, data._id]);
 
   useEffect(() => {
-    if (data?.saves && currentUserId) {
-      setIsSaved(data.saves.includes(currentUserId));
-    }
-  }, [data?.saves, currentUserId]);
+    setIsFollowing(infoUser.following.includes(data.userId._id) || false);
+  }, [infoUser.following, data.userId]);
 
-
-  const items: MenuProps["items"] = isOwnPost
+  const items: MenuProps["items"] = isOwnPost 
   ? [
-    { label: "Xem chi tiết", key: "view" },
+    { label: "View details", key: "view" },
     { type: "divider" },
-    { label: "Sửa bài viết", key: "edit" },
+    { label: "Edit post", key: "edit" },
     { type: "divider" },
-    { label: "Xóa bài viết", key: "delete" },
+    { label: "Delete post", key: "delete" },
     { type: "divider" },
-    { label: "Hủy", key: "cancel" },
+    { label: "Cancel", key: "cancel" },
   ]
-: [
-    { label: "Báo cáo", key: "report" },
+  : [
+    { label: "Report", key: "report" },
     { type: "divider" },
-    { label: "Bỏ theo dõi", key: "unfollow" },
+    { label: isFollowing ? "unFollow" : "follow", key: "follow" },
     { type: "divider" },
-    { label: "Lưu bài viết", key: "save" },
+    { label: "Save post", key: "save" },
     { type: "divider" },
-    { label: "Xem toàn bộ bài viết", key: "view" },
+    { label: "View full post", key: "view" },
     { type: "divider" },
-    { label: "Hủy", key: "cancel" },
+    { label: "Cancel", key: "cancel" },
   ];
 
   const handleClick: MenuProps["onClick"] = ({ key }) => {
-    console.log("Click menu item:", key);
-
     switch (key) {
       case "report":
         setIsReportOpen(true);
         break;
-      case "unfollow":
-        console.log("Bỏ theo dõi");
+      case "follow":
+        followUser();
         break;
       case "save":
         toggleSave();
@@ -120,6 +122,60 @@ const Post = ({ data }: Props) => {
         break;
     }
   };
+
+  const followUser = async () => {
+    try {
+      let newFollowingStatus = !isFollowing;
+      if (isFollowing) {
+        await userApi.unfollowUser(data.userId._id);
+        toast.success("Unfollowed success!");
+        newFollowingStatus = false;
+      } else {
+        await userApi.followUser(data.userId._id);
+        toast.success('Followed');
+        newFollowingStatus = true;
+      }
+      setIsFollowing(newFollowingStatus);
+    } catch (error: any) {
+      toast.error(error.message || 'Operation failed!');
+    }
+  }
+
+  const handleSubmitComment = async () => {
+    try {
+      const params = {
+        postId: data._id,
+        content: valueInput
+      }
+      const res: any = await postApi.createComment(params);
+      if (res?.statusCode === 201) {
+        toast.success(res?.message);
+        setIsModalOpen(true);
+        setValueInput("");
+        getDataListCmt();
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Operation failed!');
+    }
+  }
+
+  const handleSeeMoreCmt = () => {
+    getDataListCmt();
+    setIsModalOpen(true);
+  }
+
+  const getDataListCmt = async () => {
+    try {
+      const res: any = await postApi.getCommentsByPost(data._id);
+      if (res?.statusCode === 200) {
+        setListComment(res?.data);
+        toast.success(res?.message);
+      }
+    } catch (error) {
+      toast.error("Operation failed!");
+      console.log(error);
+    }
+  }
 
   const onEmojiClick = (emojiObject: any) => {
     const { emoji } = emojiObject;
@@ -151,18 +207,16 @@ const Post = ({ data }: Props) => {
     setIsLiking(true);
     try {
       const res: any = await postApi.toggleLike({ postId: data._id });
-
       if (res?.message === "Like") {
         setIsLiked(true);
         setAnimateLike(true);
       } else if (res?.message === "unLike") {
         setIsLiked(false);
       }
-
       setLikesCount(res?.totalLikes || 0);
     } catch (err) {
-      toast.error("Không thể thực hiện thích/bỏ thích.");
-      console.log("err", err);
+      toast.error("Unable to like/unlike.");
+      console.log(err);
     } finally {
       setIsLiking(false);
     }
@@ -173,29 +227,27 @@ const Post = ({ data }: Props) => {
     setIsSaving(true);
     try {
       const res: any = await postApi.toggleSave({ postId: data._id });
-
       if (res?.message === "Save") {
         setIsSaved(true);
-        toast.success("Đã lưu bài viết.");
+        toast.success("Article saved.");
       } else if (res?.message === "unSave") {
         setIsSaved(false);
-        toast.success("Đã bỏ lưu bài viết.");
+        toast.success("Post unsaved.");
       }
     } catch (err) {
-      toast.error("Không thể lưu bài viết.");
+      toast.error("Unable to save post.");
       console.error(err);
     } finally {
       setIsSaving(false);
     }
   };
 
-
   const handleSharePost = async (message: string) => {
     try {
       await postApi.sharePost({ postId: data._id, message });
-      toast.success("Chia sẻ bài viết thành công!");
+      toast.success("Shared article successfully!");
     } catch (err) {
-      toast.error("Không thể chia sẻ bài viết.");
+      toast.error("Cannot share post.");
       console.log(err);
     } finally {
       setIsShareOpen(false);
@@ -204,15 +256,13 @@ const Post = ({ data }: Props) => {
 
   const handleUpdatePost = async (values: any) => {
     try {
-      await postApi.updatePost(data._id, values); // PUT API
-      message.success("Đã cập nhật bài viết.");
-      // Tùy chọn: cập nhật lại UI tại chỗ nếu cần
+      await postApi.updatePost(data._id, values);
+      toast.success("Article updated.");
     } catch (error) {
+      toast.error("Update failed.");
       console.error(error);
-      message.error("Cập nhật thất bại.");
     }
   };
-
 
   const handleReportPost = async (reason: string) => {
     try {
@@ -220,15 +270,14 @@ const Post = ({ data }: Props) => {
         postId: data._id,
         reason,
       });
-      message.success("Đã gửi báo cáo.");
+      toast.success("Report sent.");
     } catch (err) {
-      message.error("Không thể gửi báo cáo.");
+      toast.error("Unable to send report.");
       console.error(err);
     } finally {
       setIsReportOpen(false);
     }
   };
-
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -245,15 +294,15 @@ const Post = ({ data }: Props) => {
 
   const fetchLikes = async () => {
     try {
-      const res = await postApi.getPostLikes(data._id); // gọi API mới tạo
-      setLikeUsers(res.data); // danh sách user
+      const res = await postApi.getPostLikes(data._id);
+      setLikeUsers(res.data);
     } catch (err) {
-      console.error('Error fetching likes:', err);
+      console.log('Error fetching likes:', err);
     }
   };
 
   const handleOpenLikeModal = () => {
-    fetchLikes(); // gọi API trước khi mở
+    fetchLikes();
     setIsLikeModalOpen(true);
   };
 
@@ -264,7 +313,6 @@ const Post = ({ data }: Props) => {
       navigate(`/profile/${id?.userId?._id}`);
     }
   }
-  
 
   return (
     <StyleCartPost>
@@ -308,7 +356,7 @@ const Post = ({ data }: Props) => {
                 key={idx}
                 src={imgObj.url}
                 alt={`img-${idx}`}
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => handleSeeMoreCmt()}
                 className="w-full h-[400px] object-cover cursor-pointer"
               />
             ))}
@@ -369,7 +417,11 @@ const Post = ({ data }: Props) => {
           </div>
         )}
 
-        <div className="cartpost_title-moreComment">Xem thêm bình luận</div>
+        <div 
+          className="cartpost_title-moreComment cursor-pointer" 
+          onClick={() => handleSeeMoreCmt()}>
+          See more comments
+        </div>
 
         <div className="cartpost_title-comment">
           <input
@@ -385,7 +437,7 @@ const Post = ({ data }: Props) => {
           {valueInput && (
             <>
               <CloseOutlined className="deleteInput" onClick={deleteInput} />
-              <span className="post_commend">Đăng</span>
+              <span className="post_commend" onClick={handleSubmitComment}>Đăng</span>
             </>
           )}
           <div onClick={() => setShowEmojiPicker((prev) => !prev)}>
@@ -404,6 +456,9 @@ const Post = ({ data }: Props) => {
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         data={data}
+        commentData={listComment}
+        infoUser={infoUser}
+        getDataListCmt={getDataListCmt}
       />
 
       <SharePost
@@ -479,9 +534,6 @@ const Post = ({ data }: Props) => {
         data={data}
         onSubmit={handleUpdatePost}
       />
-
-
-
     </StyleCartPost>
   );
 };

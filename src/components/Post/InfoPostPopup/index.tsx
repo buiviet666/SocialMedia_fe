@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Avatar, Input, Button, Divider } from 'antd';
+import { Modal, Avatar, Divider } from 'antd';
 import { CloseOutlined, CrownOutlined, HeartFilled, HeartOutlined, MessageOutlined, SendOutlined, SmileOutlined, UserOutlined } from '@ant-design/icons';
 import Slider from "react-slick";
 import styled from 'styled-components';
@@ -12,14 +13,18 @@ import toast from 'react-hot-toast';
 import SharePost from '../SharePost';
 import LikeListModal from '../LikeListModal';
 import CommentItem from '../CommentItem';
+import { RiShareForward2Fill } from 'react-icons/ri';
 
 interface InfoPostPopupProps {
   open: boolean;
   onClose: () => void;
-  data?: any
+  data?: any;
+  commentData?: any;
+  infoUser?: any;
+  getDataListCmt: () => Promise<void>;
 }
 
-const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
+const InfoPostPopup = ({ open, onClose, data, commentData, infoUser, getDataListCmt }: InfoPostPopupProps) => {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [valueInput, setValueInput] = useState("");
@@ -34,22 +39,8 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
   const [likeUsers, setLikeUsers] = useState([]);
-  // const [isLikedCmt, setIsLikedCmt] = useState<boolean>(false);
   const currentUserId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
   const navigate = useNavigate();
-
-  console.log("data", data);
-  
-  const handleDeleteComment = (commentId: string) => {
-    console.log("Delete", commentId);
-  };
-  const handleReportComment = (commentId: string) => {
-    console.log("Report", commentId);
-  };
-  
-
-
-  const [listComment, setListComment] = useState<any[]>([]);
 
   const handleClickProfile = () => {
     if (currentUserId === data?.user?._id) {
@@ -59,63 +50,23 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
     }
   }
 
-  const getDataListCmt = async () => {
-    try {
-      const res = await postApi.getCommentsByPost(data._id);
-      setListComment(res?.data)
-      console.log("res", res);
-      
-    } catch (error) {
-      console.log(error);
-      toast.error("error");
-    }
-  }
-
-  
-
-  // console.log("isLikedCmt", isLikedCmt);
-  
-  
-
   const handleSubmitCmt = async () => {
     try {
       const params = {
         postId: data._id,
         content: valueInput
       }
-      const res = await postApi.createComment(params);
-      console.log(res);
-      
+      const res: any = await postApi.createComment(params);
+      if (res?.statusCode === 201) {
+        toast.success(res?.message);
+        setValueInput("");
+        await getDataListCmt();
+      }
     } catch (error) {
+      toast.error("Operation failed!");
       console.log(error);
-      toast.error("error");
     }
   }
-
-  const handleReply = async (parentId: string, content: string) => {
-    console.log("parentId", parentId);
-    
-    try {
-      const params = {
-        postId: data._id,
-        content: content,
-        parentCommentId: parentId
-      }
-      const res = await postApi.createComment(params);
-      console.log(res);
-      
-    } catch (error) {
-      console.log(error);
-      toast.error("error");
-    }
-  };
-
-  useEffect(() => {
-    getDataListCmt();
-  }, []);
-
-  console.log("listComment", listComment);
-  
 
   const onEmojiClick = (emojiObject: any) => {
     const { emoji } = emojiObject;
@@ -157,8 +108,8 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
 
       setLikesCount(res?.totalLikes || 0);
     } catch (err) {
-      toast.error("Không thể thực hiện thích/bỏ thích.");
-      console.log("err", err);
+      toast.error("Unable to like/unlike.");
+      console.log(err);
     } finally {
       setIsLiking(false);
     }
@@ -187,22 +138,32 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
 
   const handleSharePost = async (message: string) => {
     try {
-      await postApi.sharePost({ postId: data._id, message });
-      toast.success("Chia sẻ bài viết thành công!");
+      const params = {
+        postId: data._id,
+        message
+      }
+      await postApi.sharePost(params);
+      toast.success("Shared article successfully!");
     } catch (err) {
-      toast.error("Không thể chia sẻ bài viết.");
+      toast.error("Cannot share post.");
+      console.log(err);
     } finally {
       setIsShareOpen(false);
     }
   };
 
-  const fetchLikes = async () => {
+  const handleGetListLiked = () => {
+    fetchLikesList();
+    setIsLikeModalOpen(true)
+  } 
+
+  const fetchLikesList = async () => {
     try {
-      const res = await postApi.getPostLikes(data._id); // gọi API lấy danh sách like
+      const res = await postApi.getPostLikes(data._id);
       setLikeUsers(res.data);
     } catch (err) {
       console.error('Error fetching likes:', err);
-      toast.error("Không thể tải danh sách lượt thích.");
+      toast.error("Unable to load likes list.");
     }
   };
 
@@ -210,7 +171,11 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
     if (data?.likes && currentUserId) {
       setIsLiked(data.likes.includes(currentUserId));
     }
-  }, [data?.likes, currentUserId]);
+
+    if (infoUser?.savedPosts) {
+      setIsSaved(infoUser?.savedPosts.includes(data._id));
+    }
+  }, [data?.likes, currentUserId, infoUser?.savedPosts, data._id]);
 
   return (
     <StyledModal
@@ -223,7 +188,7 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
       <div className="modal-content">
         <div className="flex-7" style={{ maxWidth: 700}}>
           <Slider {...settingsDetailPost}>
-            {data?.photoUrls?.map((item: any, idx) => (
+            {data?.photoUrls?.map((item: any, idx: any) => (
                 <div className='custom-slide-post'>
                   <img key={idx} src={item.url} alt={`modal-img-${idx}`} className="w-full" />
                 </div>
@@ -243,16 +208,13 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
 
 
           <div className="caption">
-            {listComment.map((comment) => (
+            {commentData.map((comment: any) => (
                 <CommentItem
                   key={comment._id}
                   comment={comment}
                   currentUserId={currentUserId}
-                  onReply={handleReply}
-                  onDelete={handleDeleteComment}
-                  onReport={handleReportComment}
-                  // onToggleLike={handleToggleLike}
-                  // isLikedCmt={isLikedCmt}
+                  dataPost={data}
+                  getDataListCmt={getDataListCmt}
                 />
               ))}
           </div>
@@ -275,7 +237,7 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
                     style={{ fontSize: "26px", padding: "7px" }}
                   />
                 )}
-                {/* <HeartOutlined /> */}
+
                 <MessageOutlined
                   style={{ fontSize: "26px", padding: "7px", cursor: "pointer" }}
                   onClick={() => {
@@ -283,7 +245,11 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
                     inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
                   }}
                 />
-                <SendOutlined style={{ fontSize: "26px", padding: "7px" }} onClick={() => setIsShareOpen(true)}/>
+
+                <span className='cursor-pointer' style={{ fontSize: "26px", padding: "7px" }} onClick={() => setIsShareOpen(true)}>
+                  <RiShareForward2Fill />
+
+                </span>
               </div>
               <div className="cartpost_title-save">
                 <CrownOutlined
@@ -312,10 +278,7 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
 
             <div
               className="likes cursor-pointer"
-              onClick={() => {
-                fetchLikes();
-                setIsLikeModalOpen(true);
-              }}
+              onClick={() => handleGetListLiked()}
             >
               {likesCount || 0} lượt thích
             </div>
@@ -334,7 +297,9 @@ const InfoPostPopup = ({ open, onClose, data }: InfoPostPopupProps) => {
               {valueInput && (
                 <>
                   <CloseOutlined className="text-gray-400 cursor-pointer hover:text-red-500" onClick={deleteInput} />
-                  <span className="font-semibold text-sky-500 hover:opacity-100 opacity-60 cursor-pointer" onClick={handleSubmitCmt}>Đăng</span>
+                  <span className="font-semibold hover:opacity-100 opacity-60 cursor-pointer" onClick={handleSubmitCmt}>
+                    <SendOutlined />
+                  </span>
                 </>
               )}
               <div className="relative">

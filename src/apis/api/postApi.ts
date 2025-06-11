@@ -12,6 +12,7 @@ const postApi = {
   getLikedPosts: () => axiosClient.get("/posts/liked-posts"),
   getSavedPosts: () => axiosClient.get("/posts/saved-posts"),
   getSharedPosts: () => axiosClient.get("/shares/my"),
+  getSharesByUserId: (userId: string) => axiosClient.get(`/shares/user/${userId}`),
   getPostsByPrivacy: (privacy: string) => axiosClient.get(`/posts/privacy/${privacy}`),
   getFriendPosts: () => axiosClient.get("/posts/friend-posts"),
   toggleLike: (body: { postId: string }) => axiosClient.post("/posts/toggle-like", body, {

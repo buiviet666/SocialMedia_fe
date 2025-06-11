@@ -1,4 +1,5 @@
-import { Avatar, Dropdown, Input, MenuProps, Modal } from "antd";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Avatar, Dropdown, Input, Modal } from "antd";
 import { EllipsisOutlined, HeartOutlined, HeartFilled, SendOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { formatTimeFromNow } from "../../../utils/functionCommon";
@@ -6,8 +7,16 @@ import postApi from "../../../apis/api/postApi";
 import toast from "react-hot-toast";
 import ReplyCommentItem from "../ReplyCommentItem";
 import styled from "styled-components";
+import { useNavigate } from "react-router-dom";
 
-const CommentItem = ({ comment, currentUserId, onReply, onDelete, onReport }: any) => {
+interface Props {
+  comment?: any;
+  currentUserId?: any;
+  dataPost?: any;
+  getDataListCmt: () => Promise<void>;
+}
+
+const CommentItem = ({ comment, currentUserId, dataPost, getDataListCmt }: Props) => {
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyContent, setReplyContent] = useState("");
   const [dataListCommenReply, setDataListCommenReply] = useState<any[]>([]);
@@ -18,6 +27,9 @@ const CommentItem = ({ comment, currentUserId, onReply, onDelete, onReport }: an
   const [likesCmtCount, setLikesCmtCount] = useState<number>(0);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [countCmtReply, setCountCmtReply] = useState<number>(comment?.totalReplies)
+  const isOwnComment = currentUserId === comment?.userId?._id;
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (comment?.likes) {
@@ -26,84 +38,112 @@ const CommentItem = ({ comment, currentUserId, onReply, onDelete, onReport }: an
     }
   }, [comment?.likes, currentUserId]);
 
+  const getListReplyComment = async () => {
+    try {
+      const res: any = await postApi.getRepliesByCommentId(comment._id);
+      if (res?.statusCode === 200) {
+        setDataListCommenReply(res?.data);
+        setCountCmtReply(res?.data.length);
+        toast.success(res?.message);
+      } else {
+        toast.error(res?.message);
+      }
+    } catch (error) {
+      console.log(error);
+      toast.error("Operation failed!");
+    }
+  }
+
+  const handleReplyCmt = async (parentId: string, content: string) => {
+    try {
+      const params = {
+        postId: dataPost._id,
+        content: content,
+        parentCommentId: parentId
+      }
+      const res: any = await postApi.createComment(params);
+      if (res?.statusCode === 201) {
+        toast.success(res?.message);
+        getListReplyComment();
+      }
+    } catch (error) {
+      toast.error("Operation failed!");
+      console.log(error);
+    }
+  };
+
+  const handleUpdateCmt = async () => {
+    try {
+      const res: any = await postApi.updateComment(comment._id, { content: editContent });
+      if (res?.statusCode === 200) {
+        toast.success(res?.message);
+        comment.content = editContent;
+        setIsEditing(false);
+      }
+    } catch (error) {
+      toast.error("Error updating comment!");
+      console.log(error);
+    }
+  }
 
   const onToggleLikeCmt = async (commentId: string) => {
     try {
       const res: any = await postApi.toggleLikeComment(commentId);
 
-      if (res?.message === "likedCmt") {
-        setIsLikedCmt(true);
-        setLikesCmtCount((prev) => prev + 1);
-      } else if (res?.message === "unlikedCmt") {
-        setIsLikedCmt(false);
-        setLikesCmtCount((prev) => Math.max(prev - 1, 0));
+      if (res?.statusCode === 200) {
+        const updatedComment = res.data;
+
+        setDataListCommenReply((prev) =>
+          prev.map((item) => item._id === updatedComment._id ? updatedComment : item)
+        );
+
+        if (commentId === comment._id) {
+          comment.likes = updatedComment.likes;
+        }
       }
     } catch (error) {
+      toast.error("Unable to perform action.");
       console.log(error);
-      toast.error("Không thể thực hiện hành động.");
     }
   };
 
   const handleDelete = async (data: any) => {
     try {
       const res: any = await postApi.deleteComment(data._id);
-      toast.success(res?.message);
+      if (res?.statusCode === 200) {
+        toast.success(res?.message);
+        getListReplyComment();
+        getDataListCmt();
+      }
     } catch (error) {
+      toast.error("Unable to perform action.");
       console.log(error);
-      toast.error("Không thể thực hiện hành động.");
     }
   }
 
-  const handleConfirmReport = async () => {
+  const handleConfirmReport = async (idCmt: string, reportReason: string) => {
     if (!reportReason.trim()) {
-      return toast.error("Vui lòng nhập lý do.");
+      return toast.error("Please enter reason.");
     }
-
     try {
-      const res: any = await postApi.reportComment(comment._id, reportReason);
-      toast.success(res?.message || "Đã báo cáo bình luận");
+      const res: any = await postApi.reportComment(idCmt, reportReason);
+      toast.success(res?.message);
       setIsReportModalOpen(false);
       setReportReason("");
     } catch (error) {
       console.log(error);
-      toast.error("Không thể gửi báo cáo.");
+      toast.error("Unable to send report.");
     }
   };
-
-
-
-  
-  const isOwnComment = currentUserId === comment?.userId?._id;
 
   const handleMenuClick = (key: string, data: any) => {
     if (key === "delete") handleDelete(data);
     else if (key === "report") setIsReportModalOpen(true);
     else if (key === "update") {
       setIsEditing(true);
-      setEditContent(comment.content); // fill nội dung cũ
+      setEditContent(comment.content);
     }
   };
-
-  const handleDeleteComment = (commentId: string) => {
-    console.log("Delete", commentId);
-  };
-  const handleReportComment = (commentId: string) => {
-    console.log("Report", commentId);
-  };
-  const handleToggleLike = (commentId: string) => {
-    console.log("Toggle like", commentId);
-  };
-
-  const handleUpdateCmt = async () => {
-    try {
-      await postApi.updateComment(comment._id, { content: editContent });
-      toast.success("Đã cập nhật bình luận!");
-      comment.content = editContent; // cập nhật local
-      setIsEditing(false);
-    } catch (error) {
-      toast.error("Lỗi khi cập nhật bình luận!");
-    }
-  }
 
   const handleShowReplyCmt = () => {
     if (dataListCommenReply.length > 0) {
@@ -114,27 +154,27 @@ const CommentItem = ({ comment, currentUserId, onReply, onDelete, onReport }: an
     }
   }
 
-  const getListReplyComment = async () => {
-    try {
-      const res = await postApi.getRepliesByCommentId(comment._id);
-      setDataListCommenReply(res?.data);
-      console.log(res);
-      
-    } catch (error) {
-      console.log(error);
-      toast.error("error");
+  const handleReplyRootCmt = (parentId: string, content: string) => {
+    handleReplyCmt(parentId, content);
+    getListReplyComment();
+    setReplyContent("");
+    setShowReplyInput(false);
+  }
+
+  const handleClickProfile = () => {
+    if (currentUserId === comment?.userId?._id) {
+      navigate(`/profile`)
+    } else {
+      navigate(`/profile/${comment?.userId?._id}`)
     }
   }
-  console.log("comment._id", comment._id);
-  console.log("showReply", showReply);
-  
 
   return (
     <StyleCommentItem className="itemCustomcmt flex items-start gap-3 mb-4">
       <Avatar src={comment?.userId?.avatar} />
       <div className="flex-1">
         <div className="bg-gray-100 px-4 py-2 rounded-lg relative">
-          <span className="font-semibold">{comment?.userId?.nameDisplay || comment?.userId?.userName}</span>
+          <span className="font-semibold cursor-pointer" onClick={() => handleClickProfile()}>{comment?.userId?.nameDisplay || comment?.userId?.userName}</span>
 
           {!isEditing ? (
             <p className="text-sm">{comment?.content}</p>
@@ -183,7 +223,7 @@ const CommentItem = ({ comment, currentUserId, onReply, onDelete, onReport }: an
             ) : (
               <HeartOutlined />
             )}
-            {likesCmtCount} Thích
+            {likesCmtCount} {isLikedCmt ? "unLike" : "Like"}
           </span>
           <span
             onClick={() => setShowReplyInput(!showReplyInput)}
@@ -203,14 +243,10 @@ const CommentItem = ({ comment, currentUserId, onReply, onDelete, onReport }: an
               className="border px-3 py-1 rounded-md text-sm w-full"
             />
             <SendOutlined
-              onClick={() => {
-                onReply(comment._id, replyContent);
-                setReplyContent("");
-                setShowReplyInput(false);
-              }}
+              onClick={() => handleReplyRootCmt(comment._id, replyContent)}
               className="cursor-pointer text-blue-500"
             />
-            <button onClick={() => setShowReplyInput(false)} className="text-xs text-gray-500">Đóng</button>
+            <button onClick={() => setShowReplyInput(false)} className="cursor-pointer text-xs text-gray-500">Đóng</button>
           </div>
         )}
 
@@ -221,13 +257,9 @@ const CommentItem = ({ comment, currentUserId, onReply, onDelete, onReport }: an
               onClick={() => handleShowReplyCmt()}
               className="text-blue-500 text-xs hover:underline"
             >
-              {showReply ? (
-                `Ẩn đi ${comment.totalReplies} phản hồi`
-                
-              ) : (
-                `Hiện thêm ${comment.totalReplies} phản hồi`
-              )}
-              
+              {showReply ? (`Hide ${countCmtReply} responses`) 
+              : 
+              (`Show more ${countCmtReply} responses`)}
             </button>
           </div>
         )}
@@ -235,36 +267,36 @@ const CommentItem = ({ comment, currentUserId, onReply, onDelete, onReport }: an
         {showReply && <div>
           {dataListCommenReply.map((item: any, idx: any) => (
             <ReplyCommentItem
-              data={item}
               key={idx}
+              data={item}
               currentUserId={currentUserId}
-              onReply={onReply}
-              onDelete={handleDeleteComment}
-              onReport={handleReportComment}
-              onToggleLike={handleToggleLike}
-              idMainCmt={comment._id}
+              onReply={handleReplyCmt}
+              onDelete={handleDelete}
+              onReport={handleConfirmReport}
+              onToggleLike={onToggleLikeCmt}
+              dataComment={comment}
             />
           ))}
         </div>}
         
       </div>
       <Modal
-        title="Báo cáo bình luận"
+        title="Report comment"
         open={isReportModalOpen}
-        onOk={handleConfirmReport}
+        onOk={() => handleConfirmReport(comment._id, reportReason)}
         onCancel={() => {
           setIsReportModalOpen(false);
           setReportReason("");
         }}
-        okText="Gửi báo cáo"
-        cancelText="Hủy"
+        okText="Submit report"
+        cancelText="Cancel"
       >
-        <p>Nhập lý do bạn muốn báo cáo bình luận này:</p>
+        <p>Enter the reason you want to report this comment:</p>
         <Input.TextArea
           value={reportReason}
           onChange={(e) => setReportReason(e.target.value)}
           rows={4}
-          placeholder="Nhập lý do..."
+          placeholder="Enter reason..."
         />
       </Modal>
     </StyleCommentItem>

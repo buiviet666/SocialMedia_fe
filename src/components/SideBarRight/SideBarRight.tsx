@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import styled from "styled-components";
 import Footer from "../Footer";
 import CartUser from "../CartUser";
@@ -7,15 +8,16 @@ import { useNavigate } from "react-router-dom";
 import userApi from "../../apis/api/userApi";
 import { useEffect, useState } from "react";
 import moment from "moment";
+import toast from "react-hot-toast";
 
-const DEFAULT_AVATAR = "default-avatar.jpg";
-const DEFAULT_AVATAR_URL = "/images/default-avatar.png"; // bạn có thể thay bằng URL CDN
+interface Props {
+  data?: any;
+}
 
-export default function SideBarRight() {
+export default function SideBarRight({data}: Props) {
   const navigate = useNavigate();
   const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     const fetchSuggestedUsers = async () => {
@@ -23,22 +25,21 @@ export default function SideBarRight() {
         setLoading(true);
         const res = await userApi.getRecommendedUsers();
         const rawUsers = res?.data || [];
-
         const topFive = rawUsers.slice(0, 5).map((user: any) => ({
           _id: user._id || user.id,
           avatar:
-            !user.avatar || user.avatar === DEFAULT_AVATAR
-              ? DEFAULT_AVATAR_URL
+            !user.avatar || user.avatar === <UserOutlined />
+              ? ""
               : user.avatar,
           name: user.nameDisplay || user.userName,
           des: '',
           isFollowing: user.isFollowing || false,
           bio: user?.bio
         }));
-
         setSuggestedUsers(topFive);
       } catch (error) {
-        console.error("Lỗi khi lấy gợi ý người dùng:", error);
+        toast.error("Error while getting user suggestion");
+        console.log(error);
       } finally {
         setLoading(false);
       }
@@ -47,34 +48,21 @@ export default function SideBarRight() {
     fetchSuggestedUsers();
   }, []);
 
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const res = await userApi.getCurrentUser(); // đã có rồi
-        setCurrentUser(res?.data);
-      } catch (error) {
-        console.error("Không thể lấy thông tin người dùng:", error);
-      }
-    };
-
-    fetchCurrentUser();
-  }, []);
-
   return (
     <StyleSideBarRight>
       <div className="user_profile">
         <Avatar
           size="large"
-          src={currentUser?.avatar}
-          icon={!currentUser?.avatar && <UserOutlined />}
+          src={data?.avatar}
+          icon={!data?.avatar && <UserOutlined />}
         />
         <div className="user_info">
           <span className="user_name" onClick={() => navigate("/profile")}>
-            {currentUser?.nameDisplay || currentUser?.userName || 'Người dùng'}
+            {data?.nameDisplay || data?.userName || 'Người dùng'}
           </span>
           <span className="user_location">
-            {currentUser?.createdAt
-              ? `Member from ${moment(currentUser.createdAt).format('MMMM YYYY')}`
+            {data?.createdAt
+              ? `Member from ${moment(data.createdAt).format('MMMM YYYY')}`
               : 'Đang tải thông tin...'}
           </span>
         </div>
@@ -82,8 +70,8 @@ export default function SideBarRight() {
 
       <div className="suggest_list">
         <div className="suggest_header">
-          <span>Gợi ý cho bạn</span>
-          <button onClick={() => navigate("/suggest-friend")}>Xem tất cả</button>
+          <span>Suggestions for you</span>
+          <button onClick={() => navigate("/suggest-friend")}>View all</button>
         </div>
 
         <div className="suggest_users">

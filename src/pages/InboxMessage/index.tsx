@@ -465,6 +465,19 @@ const InboxMessage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const handleReceiveNotification = (notification: any) => {
+      toast(notification.message || "Bạn có thông báo mới");
+      // Optional: hiển thị icon thông báo chưa đọc trong Navbar hoặc Inbox
+    };
+
+    socket.on("new_notification", handleReceiveNotification);
+
+    return () => {
+      socket.off("new_notification", handleReceiveNotification);
+    };
+  }, []);
+
 
   if (loading) return <div>Đang tải dữ liệu...</div>;
   

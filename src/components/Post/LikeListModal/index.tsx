@@ -22,6 +22,7 @@ const LikeListModal = ({ open, onClose, users }: Props) => {
       open={open}
       onCancel={onClose}
       footer={null}
+      centered
     >
       {users.map((user) => (
         <CartUser key={user._id} dataItem={user} size="small" />

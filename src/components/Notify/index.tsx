@@ -1,63 +1,81 @@
-import React, { useState } from "react";
-import styled from "styled-components";
-import { Avatar, List, Tabs } from "antd";
-import { HeartOutlined, MessageOutlined, UserAddOutlined } from "@ant-design/icons";
+import React, { useEffect, useState } from "react";
+import notifyApi from "../../apis/api/notifyApi";
+import { Tabs, Avatar, Tooltip, message as antMessage, Button } from "antd";
+import { HeartOutlined, MessageOutlined, UserAddOutlined, DeleteOutlined, CheckOutlined } from "@ant-design/icons";
+import moment from "moment";
 
-const mockNotifications = [
-  {
-    id: 1,
-    type: "like",
-    user: "Linh Chi",
-    avatar: "https://i.pravatar.cc/150?img=1",
-    time: "2 giờ trước",
-    message: "đã thích bài viết của bạn",
-  },
-  {
-    id: 2,
-    type: "follow",
-    user: "Jack Nguyen",
-    avatar: "https://i.pravatar.cc/150?img=2",
-    time: "5 giờ trước",
-    message: "đã bắt đầu theo dõi bạn",
-  },
-  {
-    id: 3,
-    type: "comment",
-    user: "Trà My",
-    avatar: "https://i.pravatar.cc/150?img=3",
-    time: "1 ngày trước",
-    message: "đã bình luận: Tuyệt vời quá!",
-  },
-  {
-    id: 4,
-    type: "like",
-    user: "Minh Tuấn",
-    avatar: "https://i.pravatar.cc/150?img=4",
-    time: "2 ngày trước",
-    message: "đã thích bài viết của bạn",
-  },
-];
-
-const iconMap: Record<string, React.ReactNode> = {
-  like: <HeartOutlined style={{ color: "red" }} />,
-  follow: <UserAddOutlined style={{ color: "#1890ff" }} />,
-  comment: <MessageOutlined style={{ color: "#52c41a" }} />,
+const iconMap = {
+  like: <HeartOutlined className="text-red-500" />,
+  follow: <UserAddOutlined className="text-blue-500" />,
+  comment: <MessageOutlined className="text-green-500" />,
 };
 
 const Notify = () => {
+  const [notifications, setNotifications] = useState([]);
   const [activeTab, setActiveTab] = useState("all");
 
-  const filteredData =
+  const fetchNotifications = async () => {
+    try {
+      const res = await notifyApi.getAll();
+      setNotifications(res.data);
+    } catch (err) {
+      antMessage.error("Lỗi tải thông báo");
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const filteredNotifications =
     activeTab === "all"
-      ? mockNotifications
-      : mockNotifications.filter((item) => item.type === activeTab);
+      ? notifications
+      : notifications.filter((n) => n.type === activeTab);
+
+  const handleMarkAsRead = async (id) => {
+    try {
+      await notifyApi.markAsRead(id);
+      setNotifications((prev: any) =>
+        prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+      );
+    } catch (err) {
+      antMessage.error("Không thể đánh dấu đã đọc");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await notifyApi.delete(id);
+      setNotifications((prev) => prev.filter((n) => n._id !== id));
+    } catch (err) {
+      antMessage.error("Không thể xoá thông báo");
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    try {
+      await notifyApi.deleteAll();
+      setNotifications([]);
+    } catch (err) {
+      antMessage.error("Không thể xoá tất cả thông báo");
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notifyApi.markAllAsRead();
+      setNotifications((prev: any) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch (err) {
+      antMessage.error("Không thể đánh dấu tất cả đã đọc");
+    }
+  };
 
   return (
-    <StyleNotify>
+    <div className="p-4 max-h-[85vh] overflow-y-auto">
       <Tabs
+        centered
         defaultActiveKey="all"
         onChange={(key) => setActiveTab(key)}
-        centered
         items={[
           { key: "all", label: "Tất cả" },
           { key: "follow", label: "Người theo dõi" },
@@ -65,41 +83,61 @@ const Notify = () => {
           { key: "comment", label: "Bình luận" },
         ]}
       />
-      <List
-        itemLayout="horizontal"
-        dataSource={filteredData}
-        renderItem={(item) => (
-          <List.Item>
-            <List.Item.Meta
-              avatar={<Avatar src={item.avatar} />}
-              title={
-                <span>
-                  <b>{item.user}</b> {item.message}
-                </span>
-              }
-              description={item.time}
-            />
-            <div>{iconMap[item.type]}</div>
-          </List.Item>
+
+      <div className="flex justify-end gap-2 mb-2">
+        <Button icon={<CheckOutlined />} onClick={handleMarkAllAsRead}>
+          Đánh dấu tất cả đã đọc
+        </Button>
+        <Button danger icon={<DeleteOutlined />} onClick={handleDeleteAll}>
+          Xoá tất cả
+        </Button>
+      </div>
+
+      <ul className="space-y-4">
+        {filteredNotifications.length === 0 ? (
+          <p className="text-center text-gray-500">Không có thông báo nào</p>
+        ) : (
+          filteredNotifications.map((item: any) => (
+            <li
+              key={item._id}
+              className={`flex items-center justify-between p-3 rounded-lg shadow-md border hover:shadow-lg transition-all ${
+                item.isRead ? "bg-white" : "bg-blue-50"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Avatar src={item.sender?.avatar} />
+                <div>
+                  <p className="m-0 text-sm">
+                    <b>{item.sender?.nameDisplay || item.sender?.userName}</b> {item.message}
+                  </p>
+                  <span className="text-xs text-gray-500">
+                    {moment(item.createdAt).fromNow()}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {iconMap[item.type]}
+                {!item.isRead && (
+                  <Tooltip title="Đánh dấu đã đọc">
+                    <CheckOutlined
+                      onClick={() => handleMarkAsRead(item._id)}
+                      className="cursor-pointer text-green-600 hover:text-green-800"
+                    />
+                  </Tooltip>
+                )}
+                <Tooltip title="Xoá">
+                  <DeleteOutlined
+                    onClick={() => handleDelete(item._id)}
+                    className="cursor-pointer text-red-500 hover:text-red-700"
+                  />
+                </Tooltip>
+              </div>
+            </li>
+          ))
         )}
-      />
-    </StyleNotify>
+      </ul>
+    </div>
   );
 };
 
 export default Notify;
-
-const StyleNotify = styled.div`
-  padding: 8px;
-  max-height: 80vh;
-  overflow-y: auto;
-
-  .ant-tabs-nav {
-    margin-bottom: 8px;
-  }
-
-  .ant-list-item {
-    align-items: center;
-    padding: 8px 0;
-  }
-`;

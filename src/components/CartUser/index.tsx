@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useState } from 'react';
 import styled, { css } from 'styled-components';
 import { Avatar, Button } from 'antd';
 import { UserOutlined, UploadOutlined } from '@ant-design/icons';
@@ -8,8 +9,7 @@ import { useNavigate } from 'react-router-dom';
 
 export interface CartUserProps {
   dataItem?: any;
-  isFollow?: boolean; // giữ để tương thích, không dùng nữa
-  onToggleFollow?: () => void; // fallback nếu muốn xử lý bên ngoài
+  onToggleFollow?: () => void;
   onChangeAvatar?: () => void;
   size?: 'small' | 'medium' | 'large';
 }
@@ -36,20 +36,29 @@ const CartUser = ({
     if (!dataItem?._id) return;
     setLoading(true);
     try {
+      let newFollowingStatus = !isFollowing;
       if (isFollowing) {
         await userApi.unfollowUser(dataItem._id);
-        toast.success('Đã hủy theo dõi');
+        toast.success('Unfollowed');
+        newFollowingStatus = false;
       } else {
         await userApi.followUser(dataItem._id);
-        toast.success('Đã theo dõi');
+        toast.success('Followed');
+        newFollowingStatus = true;
       }
-      setIsFollowing(!isFollowing);
-      onToggleFollow?.(); // gọi callback nếu có
+      setIsFollowing(newFollowingStatus);
+      onToggleFollow?.();
     } catch (err) {
-      toast.error('Thao tác thất bại!');
+      toast.error('Operation failed!');
+      console.log(err);
     }
     setLoading(false);
   };
+
+
+  useEffect(() => {
+    setIsFollowing(dataItem?.isFollowing || false);
+  }, [dataItem?.isFollowing]);
 
   return (
     <StyleCartUser $size={size}>
@@ -72,7 +81,7 @@ const CartUser = ({
           )}
         </div>
         <div className="cartuser_info">
-          <span className="cartuser_name" onClick={() => navigate(`/profile/${dataItem._id}`)}>
+          <span className="cartuser_name" onClick={() => navigate(`/profile/${dataItem?._id}`)}>
             {dataItem?.name || dataItem?.nameDisplay || dataItem?.userName}
           </span>
           <div className="cartuser_desc">{dataItem?.bio || 'Mô tả ngắn'}</div>
@@ -85,7 +94,7 @@ const CartUser = ({
             loading={loading}
             type={isFollowing ? 'default' : 'primary'}
           >
-            {isFollowing ? 'Đã theo dõi' : 'Theo dõi'}
+            {isFollowing ? 'unFollow' : 'Following'}
           </Button>
         </div>
       )}

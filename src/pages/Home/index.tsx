@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import styled from "styled-components";
 import FilterPost from "../../components/FilterPost/FilterPost";
 import SideBarRight from "../../components/SideBarRight/SideBarRight";
@@ -8,22 +9,16 @@ import Post from "../../components/Post";
 import { useDraggable } from "react-use-draggable-scroll";
 import { useCallback, useEffect, useRef, useState } from "react";
 import postApi from "../../apis/api/postApi";
+import toast from "react-hot-toast";
+import userApi from "../../apis/api/userApi";
 
 export default function Home() {
   const cartPostRef = useRef<HTMLDivElement>(null!);
-  const [loading, setLoading] = useState(false);
   const { events } = useDraggable(cartPostRef);
   const [data, setData] = useState<any[]>([]);
+  const [infoUser, setInfoUser] = useState(null);
   
-  
-  // console.log("isLiked", isLiked);
-  // console.log("animateLike", animateLike);
-  // console.log("likesCount", likesCount);
-  
-  
-
   const loadDataByFilter = useCallback(async (key: string) => {
-    setLoading(true);
     try {
       let res;
       switch (key) {
@@ -42,40 +37,40 @@ export default function Home() {
         default:
           res = { data: [] };
       }
-      setData(res.data);
-    } catch (error) {
-      console.error("Lỗi khi tải dữ liệu:", error);
+      if (res.data) {
+        setData(res.data);
+      } else {
+        toast.error("Error loading data");
+      }
+    } catch (error: any) {
+      toast.error(error?.message || "Error loading data");
     }
-    setLoading(false);
   }, []);
 
   const handleFilterChange = (key: string) => {
     loadDataByFilter(key);
   };
 
-  // const toggleLike = async (idPost: string) => {
-  //   if (isLiking) return;
-  //   setIsLiking(true);
-  //   try {
-  //     const res: any = await postApi.toggleLike({ postId: idPost });
-      
-  //     if (res?.message === "Like") {
-  //       setIsLiked(true);
-  //       setAnimateLike(true);
-  //     } else if (res?.message === "unLike") {
-  //       setIsLiked(false);
-  //     }
-  //     setLikesCount(res?.totalLikes);
-  //   } catch (err) {
-  //     console.log(err);
-  //   } finally {
-  //     setIsLiking(false);
-  //   }
-  // };
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const res: any = await userApi.getCurrentUser();
+        if (res?.statusCode === 200) {
+          setInfoUser(res?.data);
+        } else {
+          toast.error(res?.message || "Error");
+        }
+      } catch (error) {
+        console.error("Không thể lấy thông tin người dùng:", error);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   useEffect(() => {
     loadDataByFilter("1");
-  }, []);
+  }, [loadDataByFilter]);
 
   return (
     <StyleHome>
@@ -97,14 +92,18 @@ export default function Home() {
           >
             <List
               dataSource={data}
-              renderItem={(item: any) => <Post data={item} key={item._id} 
-              // callData={toggleLike} isLiked={isLiked} animateLike={animateLike} likesCount={likesCount}
-              />}
+              renderItem={(item: any) => (
+                <Post 
+                  data={item} 
+                  key={item._id}
+                  infoUser={infoUser}
+                />
+              )}
             />
           </InfiniteScroll>
         </div>
       </div>
-      <SideBarRight />
+      <SideBarRight data={infoUser}/>
     </StyleHome>
   );
 }

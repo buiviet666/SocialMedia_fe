@@ -1,20 +1,19 @@
 import { DownCircleOutlined } from "@ant-design/icons";
 import { Dropdown, MenuProps } from "antd";
-import * as React from "react";
 import styled from "styled-components";
 
 export default function FilterPost({ onChangeFilter }: { onChangeFilter: (key: string, label: string) => void }) {
   const items: MenuProps["items"] = [
-    { label: "Dành cho bạn", key: "1" },
-    { label: "Đang theo dõi", key: "2" },
-    { label: "Đã thích", key: "3" },
-    { label: "Đã lưu", key: "4" },
+    { label: "For You", key: "1" },
+    { label: "Following", key: "2" },
+    { label: "Liked", key: "3" },
+    { label: "Saved", key: "4" },
   ];
 
   return (
     <StyleFilterPost>
       <div className="filter-post_container">
-        <span>Dành cho bạn</span>
+        <span>For you</span>
         <Dropdown
           menu={{ items, onClick: ({ key, domEvent }) => {
             const label = (domEvent.target as HTMLElement).innerText;
@@ -33,7 +32,6 @@ export default function FilterPost({ onChangeFilter }: { onChangeFilter: (key: s
     </StyleFilterPost>
   );
 }
-
 
 const StyleFilterPost = styled.div`
   height: 60px;

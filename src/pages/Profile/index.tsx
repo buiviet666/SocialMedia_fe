@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import { Avatar, Button, Dropdown, Modal, Tabs, TabsProps, message } from "antd";
@@ -8,33 +9,36 @@ import Footer from "../../components/Footer";
 import postApi from "../../apis/api/postApi";
 import userApi from "../../apis/api/userApi";
 import toast from "react-hot-toast";
-import imgNotFound from "../../assets/notFound.svg";
 import EmptyTab from "./TabContentProfile/EmtyTab";
 import reportApi from "../../apis/api/reportApi";
+import ModalListUser from "./ModalListUser";
 
 const Profile = () => {
   const { id } = useParams();
   const [showPopup, setShowPopup] = useState(false);
   const [popupType, setPopupType] = useState<"followers" | "following">("followers");
 
+  const [inforCurrentUser, setInforCurrentUser] = useState<any>(null);
+  const [userInfo, setUserInfo] = useState<any>(null);
   const [posts, setPosts] = useState([]);
   const [likedPosts, setLikedPosts] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
   const [sharedPosts, setSharedPosts] = useState([]);
-  const [userInfo, setUserInfo] = useState<any>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
   const [isFollowing, setIsFollowing] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [followList, setFollowList] = useState<any[]>([]);
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
-
-
   const navigate = useNavigate();
-
   const isMe = !id;
-
+  
+  // console.log("inforUser", inforCurrentUser);
+  // console.log("isFollowing", isFollowing);
+  // console.log("isBlocked", isBlocked);
+  // console.log("followList", followList);
+  
   const items: TabsProps["items"] = [
     {
       key: "1",
@@ -42,7 +46,7 @@ const Profile = () => {
       children: posts.length > 0 ? (
         <TabContentProfile data={posts} />
       ) : (
-        <EmptyTab message={isMe ? "Bạn chưa đăng bài viết nào" : "Người này chưa có bài viết nào"} />
+        <EmptyTab message={isMe ? "You have not posted any posts" : "This person has not posted any posts"} />
       ),
     },
     {
@@ -51,7 +55,7 @@ const Profile = () => {
       children: savedPosts.length > 0 ? (
         <TabContentProfile data={savedPosts} />
       ) : (
-        <EmptyTab message="Chưa có bài viết nào được lưu" />
+        <EmptyTab message="No posts saved yet" />
       ),
     },
     {
@@ -60,7 +64,7 @@ const Profile = () => {
       children: likedPosts.length > 0 ? (
         <TabContentProfile data={likedPosts} />
       ) : (
-        <EmptyTab message="Chưa có bài viết nào được thích" />
+        <EmptyTab message="No posts have been liked yet" />
       ),
     },
     {
@@ -69,7 +73,7 @@ const Profile = () => {
       children: sharedPosts.length > 0 ? (
         <TabContentProfile data={sharedPosts} type="shared" />
       ) : (
-        <EmptyTab message="Chưa có bài viết nào được chia sẻ" />
+        <EmptyTab message="No posts have been shared yet" />
       ),
     },
   ];
@@ -82,14 +86,17 @@ const Profile = () => {
     setPopupType(type);
     setShowPopup(true);
 
-    const ids = userInfo?.[type] || [];
+    const list = (isMe ? inforCurrentUser : userInfo)?.[type] || [];
 
-    if (ids.length > 0) {
+    if (list.length > 0) {
       try {
-        const res = await userApi.getUsersByIds(ids);
-        setFollowList(res.data);
+        const res: any = await userApi.getUsersByIds(list);
+        if (res?.statusCode === 200) {
+          setFollowList(res.data);
+        }
       } catch (err) {
-        toast.error("Không thể tải danh sách người dùng");
+        toast.error("Unable to load user list");
+        console.log(err);
       }
     } else {
       setFollowList([]);
@@ -98,51 +105,54 @@ const Profile = () => {
 
   const refreshCurrentUser = async () => {
     try {
-      const res = await userApi.getCurrentUser();
-      setCurrentUserId(res.data._id);
-      return res.data;
+      const res: any = await userApi.getCurrentUser();
+      if (res?.statusCode === 200) {
+        setInforCurrentUser(res?.data);
+      }
     } catch (error) {
-      console.error("Lỗi khi lấy current user:", error);
-      return null;
+      toast.error("Error when getting current user");
+      console.log(error);
     }
   };
 
-  const handleToggleFollow = async (targetId: string, isFollow: boolean) => {
+  const handleToggleFollow = async (targetId: string) => {
     try {
-      if (isFollow) {
+      if (isFollowing) {
         await userApi.unfollowUser(targetId);
-        message.success("Đã hủy theo dõi");
+        toast.success("Unfollowed");
+        setIsFollowing(false);
       } else {
         await userApi.followUser(targetId);
-        message.success("Đã theo dõi");
+        toast.success("Followed");
+        setIsFollowing(true);
       }
-
-      const updated = await refreshCurrentUser();
-      setIsFollowing(updated?.following?.some((u: any) => u._id === targetId));
-
-      if (!isMe) {
-        const res = await userApi.getUserById(id!);
-        setUserInfo(res.data);
-      }
+      const res = await userApi.getUserById(targetId);
+      setUserInfo(res?.data);
     } catch {
-      message.error("Không thể thực hiện thao tác theo dõi");
+      toast.error("Unable to perform tracking operation");
     }
   };
 
-  const handleToggleBlock = async (targetId: string, isBlock: boolean) => {
+  const handleToggleBlock = async (targetId: string) => {
     try {
-      if (isBlock) {
+      if (isBlocked) {
         await userApi.unblockUser(targetId);
-        message.success("Đã bỏ chặn người dùng");
+        toast.success("Unblocked user");
+        setIsBlocked(false);
+        fetchAll();
       } else {
         await userApi.blockUser(targetId);
-        message.success("Đã chặn người dùng");
+        toast.success("Blocked user");
+        setIsBlocked(true);
       }
-
-      const updated = await refreshCurrentUser();
-      setIsBlocked(updated?.blockedUsers?.includes(targetId));
+      const res = await userApi.getUserById(targetId);
+      setUserInfo(res?.data);
+      const current: any = await refreshCurrentUser();
+      if (current) {
+        setIsBlocked(current.blockedUsers?.includes(targetId));
+      }
     } catch {
-      message.error("Không thể thực hiện thao tác chặn");
+      toast.error("Unable to perform block operation");
     }
   };
 
@@ -165,40 +175,55 @@ const Profile = () => {
     }
   };
 
+  const fetchAll = async () => {
+    try {
+      refreshCurrentUser();
+      if (isMe) {
+        const [resDataPostsAll, resDataLikedPosts, resDataSavedPosts, resDataSharedPosts] = await Promise.all([
+          postApi.getMyPosts(),
+          postApi.getLikedPosts(),
+          postApi.getSavedPosts(),
+          postApi.getSharedPosts(),
+        ]);
+        setPosts(resDataPostsAll?.data);
+        setLikedPosts(resDataLikedPosts?.data);
+        setSavedPosts(resDataSavedPosts?.data);
+        setSharedPosts(resDataSharedPosts?.data);
+      } else if (!isMe) {
+        const [resDataUser, resDataPosts, resDataSharedPosts] = await Promise.all([
+          userApi.getUserById(id!),
+          postApi.getPostsByUserId(id!),
+          postApi.getSharesByUserId(id!)
+        ]);
+        setUserInfo(resDataUser?.data);
+        setPosts(resDataPosts?.data);
+        setSharedPosts(resDataSharedPosts?.data);
+      };
+    } catch (error) {
+      toast.error("Unable to load profile data");
+      console.log(error);
+    }
+  };
+
   useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [currentUserRes, profileRes, postRes, likeRes, saveRes, shareRes] =
-          await Promise.all([
-            userApi.getCurrentUser(),
-            isMe ? userApi.getCurrentUser() : userApi.getUserById(id!),
-            isMe ? postApi.getMyPosts() : postApi.getPostsByUserId(id!),
-            isMe ? postApi.getLikedPosts() : Promise.resolve({ data: [] }),
-            isMe ? postApi.getSavedPosts() : Promise.resolve({ data: [] }),
-            isMe ? postApi.getSharedPosts() : Promise.resolve({ data: [] }),
-          ]);
-
-        const currentId = currentUserRes.data._id;
-        setCurrentUserId(currentId);
-
-        const currentUser = currentUserRes.data;
-        if (!isMe) {
-          setIsFollowing(currentUser.following?.some((u: any) => u._id === id));
-          setIsBlocked(currentUser.blockedUsers?.includes(id));
-        }
-
-        setUserInfo(profileRes.data);
-        setPosts(postRes.data);
-        setLikedPosts(likeRes.data);
-        setSavedPosts(saveRes.data);
-        setSharedPosts(shareRes.data);
-      } catch (err) {
-        message.error("Không thể tải dữ liệu hồ sơ");
-      }
-    };
-
     fetchAll();
   }, [id]);
+
+  useEffect(() => {
+  if (inforCurrentUser && userInfo) {
+    const blocked = inforCurrentUser?.blockedUsers?.includes(userInfo._id);
+    const following = userInfo?.followers?.some((f: any) => f._id === inforCurrentUser._id);
+
+    setIsBlocked(blocked);
+    setIsFollowing(following);
+
+    if (blocked) {
+      toast.error("This user has been blocked");
+      setPosts([]);
+      setSharedPosts([]);
+    }
+  }
+}, [inforCurrentUser, userInfo]);
 
   return (
     <StyleProfile>
@@ -206,26 +231,27 @@ const Profile = () => {
         <div className="profile-header">
           <Avatar
             size={100}
-            src={userInfo?.avatar}
-            icon={!userInfo?.avatar && <UserOutlined />}
+            src={isMe ? inforCurrentUser?.avatar : userInfo?.avatar && <UserOutlined />}
+            icon={isMe ? inforCurrentUser?.avatar : !userInfo?.avatar && <UserOutlined />}
             className="profile-avatar"
           />
           <div className="profile-info">
             <div className="profile-actions">
-              <h2 className="username">{userInfo?.nameDisplay || userInfo?.userName || ""}</h2>
+              <h2 className="username">{isMe ? inforCurrentUser?.nameDisplay || inforCurrentUser?.userName || "" : userInfo?.nameDisplay || userInfo?.userName || ""}</h2>
 
               {isMe ? (
                 <>
-                  <Button onClick={() => navigate("/profile/edit")}>Chỉnh sửa hồ sơ</Button>
-                  <Button onClick={() => navigate("/profile/liked")}>Xem kho đã thích</Button>
+                  <Button onClick={() => navigate("/profile/edit")}>Edit profile</Button>
+                  {/* <Button onClick={() => navigate("/profile/liked")}>View liked inventory</Button> */}
                 </>
-              ) : currentUserId !== id ? (
+              ) : 
+              inforCurrentUser?._id !== id ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Button
                     type={isFollowing ? "default" : "primary"}
-                    onClick={() => handleToggleFollow(id!, isFollowing)}
+                    onClick={() => handleToggleFollow(userInfo._id)}
                   >
-                    {isFollowing ? "Hủy theo dõi" : "Theo dõi"}
+                    {isFollowing ? "Unfollow" : "Follow"}
                   </Button>
 
                   <Dropdown
@@ -234,15 +260,15 @@ const Profile = () => {
                       items: [
                         {
                           key: "report",
-                          label: "Báo cáo",
+                          label: "Report",
                         },
                         {
                           key: "block",
-                          label: isBlocked ? "Bỏ chặn" : "Chặn",
+                          label: isBlocked ? "UnBlock" : "Block",
                         },
                       ],
                       onClick: ({ key }) => {
-                        if (key === "block") handleToggleBlock(id!, isBlocked);
+                        if (key === "block") handleToggleBlock(userInfo._id);
                         else if (key === "report") setIsReportModalOpen(true);
                       },
                     }}
@@ -254,25 +280,23 @@ const Profile = () => {
             </div>
 
             <div className="profile-stats">
-              <p>{posts.length} bài viết</p>
+              <p>{posts.length} Post</p>
               <p onClick={() => handleOpenModal("followers")}>
-                {userInfo?.followers?.length || 0} người theo dõi
+                {isMe ? inforCurrentUser?.followers?.length || 0 : userInfo?.followers?.length || 0} followers
               </p>
               <p onClick={() => handleOpenModal("following")}>
-                Đang theo dõi {userInfo?.following?.length || 0} người
+                Following {isMe ? inforCurrentUser?.following?.length || 0 : userInfo?.following?.length || 0}
               </p>
             </div>
 
             <div className="profile-bio">
-              <span>{userInfo?.bio || "Chưa có giới thiệu."}</span>
+              <span>{isMe ? inforCurrentUser?.bio : userInfo?.bio || "No introduction yet."}</span>
             </div>
           </div>
         </div>
-
         <div className="profile-tabs">
           <Tabs centered defaultActiveKey="1" items={itemsRender} />
         </div>
-
         <Footer />
       </div>
 
@@ -284,60 +308,21 @@ const Profile = () => {
         title={
           <div className="text-xl font-semibold text-center">
             {popupType === "followers"
-              ? isMe
-                ? "Người theo dõi bạn"
-                : "Người theo dõi họ"
-              : isMe
-                ? "Bạn đang theo dõi"
-                : "Họ đang theo dõi"}
+              ? isMe ? "Your followers" : "Their followers"
+              : isMe ? "You are following" : "They are following"}
           </div>
         }
         centered
       >
-        <div className="max-h-[400px] overflow-y-auto space-y-4 px-2">
-          {followList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center text-gray-500">
-              <img src={imgNotFound} alt="empty" className="w-40 h-40 mb-4 opacity-70" />
-              <p>
-                {popupType === "followers"
-                  ? isMe
-                    ? "Chưa có ai theo dõi bạn"
-                    : "Người này chưa có người theo dõi"
-                  : isMe
-                    ? "Bạn chưa theo dõi ai"
-                    : "Người này chưa theo dõi ai"}
-              </p>
-            </div>
-          ) : (
-            followList.map((user: any) => {
-              const isFollowing = userInfo?.following?.includes(user._id);
-              const isCurrentUser = currentUserId === user._id;
-
-              return (
-                <div
-                  key={user._id}
-                  className="flex items-center justify-between px-4 py-2 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition"
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar src={user.avatar} size={48} />
-                    <span className="font-medium text-gray-800">
-                      {user.nameDisplay || user.userName}
-                    </span>
-                  </div>
-                  {!isCurrentUser && (
-                    <Button
-                      type="default"
-                      className="!h-8 !px-3 !text-sm"
-                      onClick={() => handleToggleFollow(user._id, isFollowing)}
-                    >
-                      {isFollowing ? "Hủy theo dõi" : "Theo dõi"}
-                    </Button>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
+        <ModalListUser
+          dataUser={isMe? inforCurrentUser : userInfo}
+          followList={followList}
+          checkUser={isMe} 
+          popupType={popupType}
+          currentUser={inforCurrentUser}
+          refreshCurrentUser={refreshCurrentUser}
+          setShowPopup={setShowPopup}
+        />
       </Modal>
       <Modal
         open={isReportModalOpen}
@@ -407,6 +392,10 @@ const StyleProfile = styled.div`
       margin: 0;
       font-size: 14px;
       cursor: pointer;
+    }
+
+    p:first-child {
+      cursor: unset;
     }
   }
 

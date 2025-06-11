@@ -151,28 +151,28 @@ console.log("selectedFriends", selectedFriends);
   const items: MenuProps["items"] = [
     {
       icon: <CrownOutlined />,
-      label: "Đã lưu",
+      label: "Saved",
       key: "1",
     },
     {
       icon: <SettingOutlined />,
-      label: "Cài đặt",
+      label: "Settings",
       key: "2",
     },
     {
       icon: <SunOutlined />,
-      label: "Chuyển chế độ",
+      label: "Switch Mode",
       key: "3",
     },
     {
       type: "divider",
     },
     // {
-    //   label: "chuyển tài khoản",
-    //   key: "4",
+      // label: "Switch Account",
+      // key: "4",
     // },
     {
-      label: "Đăng xuất",
+      label: "Log Out",
       key: "5",
     },
   ];
@@ -180,13 +180,15 @@ console.log("selectedFriends", selectedFriends);
   const handleClick: MenuProps["onClick"] = ({ key }) => {
     switch (key) {
       case "1":
+        toast.success("This feature is developing");
         console.log("Đã lưu");
         break;
       case "2":
-        console.log("Cài đặt");
+        navigate("/profile/edit")
         break;
       case "3":
         console.log("Chuyển chế độ");
+        toast.success("This feature is developing");
         break;
       // case "4":
       //   console.log("Chuyển tài khoản");
@@ -213,12 +215,12 @@ console.log("selectedFriends", selectedFriends);
       component: <Message onClose={() => setOpen(false)}/>,
       title: "Nhắn tin",
     },
-    // {
-    //   icon: <BellOutlined />,
-    //   path: "",
-    //   component: <Notify />,
-    //   title: "Thông báo",
-    // },
+    {
+      icon: <BellOutlined />,
+      path: "",
+      component: <Notify />,
+      title: "Thông báo",
+    },
     {
       icon: <PlusOutlined />,
       popup: true,
