@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { DownCircleOutlined } from "@ant-design/icons";
 import { Dropdown, MenuProps } from "antd";
 import styled from "styled-components";
 
-export default function FilterPost({ onChangeFilter }: { onChangeFilter: (key: string, label: string) => void }) {
+export default function FilterPost({ onChangeFilter, nameFilter }: { onChangeFilter: (key: string, label: string) => void, nameFilter?: any }) {
   const items: MenuProps["items"] = [
     { label: "For You", key: "1" },
     { label: "Following", key: "2" },
@@ -13,7 +14,7 @@ export default function FilterPost({ onChangeFilter }: { onChangeFilter: (key: s
   return (
     <StyleFilterPost>
       <div className="filter-post_container">
-        <span>For you</span>
+        <span>{nameFilter}</span>
         <Dropdown
           menu={{ items, onClick: ({ key, domEvent }) => {
             const label = (domEvent.target as HTMLElement).innerText;

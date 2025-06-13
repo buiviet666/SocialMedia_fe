@@ -5,11 +5,10 @@ import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import EmojiPicker from "emoji-picker-react";
-import { Avatar, Dropdown, MenuProps, message } from "antd";
+import { Avatar, Dropdown, MenuProps } from "antd";
 import {
   CloseOutlined,
   CommentOutlined,
-  CrownOutlined,
   EllipsisOutlined,
   HeartFilled,
   HeartOutlined,
@@ -23,19 +22,30 @@ import InfoPostPopup from "./InfoPostPopup";
 import postApi from "../../apis/api/postApi";
 import SharePost from "./SharePost";
 import LikeListModal from "./LikeListModal";
-import ReportPostModal from "./ReportPostModal";
-import { Modal } from "antd";
 import EditPostModal from "./EditPostModal";
 import { formatTimeFromNow } from "../../utils/functionCommon";
 import toast from "react-hot-toast";
 import userApi from "../../apis/api/userApi";
+import { FaRegBookmark } from "react-icons/fa";
+import { RiShareForward2Fill } from "react-icons/ri";
+import ModalReport from "../Modal/ModalReport";
+import ModalDelete from "../Modal/ModalDelete";
+
+const reasonReport = [
+  "Inappropriate content",
+  "Spam or misleading",
+  "Hate speech",
+  "Nudity or sexual content",
+  "Other"
+]
 
 interface Props {
   data?: any;
   infoUser?: any;
+  refreshPosts?: () => void;
 }
 
-const Post = ({ data, infoUser }: Props) => {
+const Post = ({ data, infoUser, refreshPosts}: Props) => {
   const [valueInput, setValueInput] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -52,12 +62,14 @@ const Post = ({ data, infoUser }: Props) => {
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
   const [likeUsers, setLikeUsers] = useState([]);
   const [listComment, setListComment] = useState<any[]>([]);
   const [isFollowing, setIsFollowing] = useState<boolean>(infoUser.following.includes(data.userId._id) || false);
+
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [loadingDelete, setLoadingDelete] = useState(false);
 
   const isOwnPost = currentUserId === data?.userId?._id;
 
@@ -90,7 +102,7 @@ const Post = ({ data, infoUser }: Props) => {
     { type: "divider" },
     { label: isFollowing ? "unFollow" : "follow", key: "follow" },
     { type: "divider" },
-    { label: "Save post", key: "save" },
+    { label: isSaved ? "unSave Post" : "Save post", key: "save" },
     { type: "divider" },
     { label: "View full post", key: "view" },
     { type: "divider" },
@@ -169,7 +181,6 @@ const Post = ({ data, infoUser }: Props) => {
       const res: any = await postApi.getCommentsByPost(data._id);
       if (res?.statusCode === 200) {
         setListComment(res?.data);
-        toast.success(res?.message);
       }
     } catch (error) {
       toast.error("Operation failed!");
@@ -258,16 +269,23 @@ const Post = ({ data, infoUser }: Props) => {
     try {
       await postApi.updatePost(data._id, values);
       toast.success("Article updated.");
+      refreshPosts?.();
     } catch (error) {
       toast.error("Update failed.");
       console.error(error);
     }
   };
 
-  const handleReportPost = async (reason: string) => {
+  const handleReportPost = async ({
+    targetId,
+    reason,
+  }: {
+    targetId: string;
+    reason: string;
+  }) => {
     try {
       await postApi.reportPost({
-        postId: data._id,
+        postId: targetId,
         reason,
       });
       toast.success("Report sent.");
@@ -278,6 +296,7 @@ const Post = ({ data, infoUser }: Props) => {
       setIsReportOpen(false);
     }
   };
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -313,6 +332,21 @@ const Post = ({ data, infoUser }: Props) => {
       navigate(`/profile/${id?.userId?._id}`);
     }
   }
+
+  const handleDeletePost = async () => {
+    try {
+      setLoadingDelete(true);
+      await postApi.deletePost(data._id);
+      toast.success("Post deleted successfully.");
+      setIsDeleteConfirmOpen(false);
+      refreshPosts?.();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete post.");
+    } finally {
+      setLoadingDelete(false);
+    }
+  };
 
   return (
     <StyleCartPost>
@@ -387,10 +421,12 @@ const Post = ({ data, infoUser }: Props) => {
                 inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
             />
-            <SendOutlined style={{ fontSize: "26px", padding: "7px" }} onClick={() => setIsShareOpen(true)}/>
+            <span style={{ fontSize: "26px", padding: "7px", cursor: "pointer" }} onClick={() => setIsShareOpen(true)}>
+              <RiShareForward2Fill />
+            </span>
           </div>
           <div className="cartpost_title-save">
-            <CrownOutlined
+            <FaRegBookmark
               onClick={toggleSave}
               style={{
                 fontSize: "26px",
@@ -407,7 +443,7 @@ const Post = ({ data, infoUser }: Props) => {
           onClick={handleOpenLikeModal}
           style={{ cursor: "pointer" }}
         >
-          {likesCount} lượt thích
+          {likesCount} like
         </div>
 
 
@@ -420,7 +456,7 @@ const Post = ({ data, infoUser }: Props) => {
         <div 
           className="cartpost_title-moreComment cursor-pointer" 
           onClick={() => handleSeeMoreCmt()}>
-          See more comments
+          See info post
         </div>
 
         <div className="cartpost_title-comment">
@@ -437,7 +473,9 @@ const Post = ({ data, infoUser }: Props) => {
           {valueInput && (
             <>
               <CloseOutlined className="deleteInput" onClick={deleteInput} />
-              <span className="post_commend" onClick={handleSubmitComment}>Đăng</span>
+              <span className="post_commend" onClick={handleSubmitComment}>
+                <SendOutlined />
+              </span>
             </>
           )}
           <div onClick={() => setShowEmojiPicker((prev) => !prev)}>
@@ -471,62 +509,29 @@ const Post = ({ data, infoUser }: Props) => {
         open={isLikeModalOpen}
         onClose={() => setIsLikeModalOpen(false)}
         users={likeUsers}
+        infoUser={infoUser}
       />
 
-      <ReportPostModal
+      <ModalReport
         open={isReportOpen}
         onClose={() => setIsReportOpen(false)}
-        onSubmit={handleReportPost}
+        onSubmit={({ targetId, reason }) =>
+          handleReportPost({ targetId, reason })
+        }
+        targetId={data._id}
+        targetType="POST"
+        reportReasons={reasonReport}
+        title="Report Post"
       />
 
-      <Modal
+      <ModalDelete
         open={isDeleteConfirmOpen}
-        onCancel={() => setIsDeleteConfirmOpen(false)}
-        footer={null}
-        centered
-      >
-        <h3>Bạn có chắc chắn muốn xóa bài viết này?</h3>
-        <p>Hành động này không thể hoàn tác.</p>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: 24 }}>
-          <button
-            onClick={() => setIsDeleteConfirmOpen(false)}
-            style={{
-              padding: "8px 16px",
-              border: "1px solid #ccc",
-              borderRadius: 4,
-              background: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            Hủy
-          </button>
-
-          <button
-            onClick={async () => {
-              try {
-                await postApi.deletePost(data._id);
-                message.success("Đã xóa bài viết.");
-                setIsDeleteConfirmOpen(false);
-                // Cập nhật UI: ví dụ gọi reload hoặc xóa khỏi danh sách
-              } catch (err) {
-                console.error(err);
-                message.error("Không thể xóa bài viết.");
-              }
-            }}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#ff4d4f",
-              color: "#fff",
-              border: "none",
-              borderRadius: 4,
-              cursor: "pointer",
-            }}
-          >
-            Xóa
-          </button>
-        </div>
-      </Modal>
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={handleDeletePost}
+        loading={loadingDelete}
+        title="Delete Post"
+        description="Are you sure you want to delete this post? This action cannot be undone."
+      />
 
       <EditPostModal
         open={isEditOpen}
@@ -657,7 +662,6 @@ const StyleCartPost = styled.div`
     margin-left: 4px;
     margin-right: 8px;
     font-weight: 700;
-    color: #37afe1;
     cursor: pointer;
     opacity: 0.6;
     transition: all 0.6s;
@@ -687,5 +691,15 @@ const StyleCartPost = styled.div`
   .cartpost_title-info span {
     color: #737373;
     font-weight: 400;
+  }
+
+  .cartpost_title-save svg {
+    width: 40px;
+    height: 40px;
+  }
+
+  .cartpost_title-iconClick {
+    display: flex;
+    flex-direction: row;
   }
 `

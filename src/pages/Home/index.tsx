@@ -16,7 +16,9 @@ export default function Home() {
   const cartPostRef = useRef<HTMLDivElement>(null!);
   const { events } = useDraggable(cartPostRef);
   const [data, setData] = useState<any[]>([]);
-  const [infoUser, setInfoUser] = useState(null);
+  const [infoUser, setInfoUser] = useState<any>(null);
+  const [keyFilter, setKeyFilter] = useState('1');
+  const [nameFilter, setNameFilter] = useState('For You')
   
   const loadDataByFilter = useCallback(async (key: string) => {
     try {
@@ -47,8 +49,14 @@ export default function Home() {
     }
   }, []);
 
-  const handleFilterChange = (key: string) => {
+  const handleFilterChange = (key: string, label: string) => {
     loadDataByFilter(key);
+    setNameFilter(label);
+    setKeyFilter(key);
+  };
+
+  const refreshPosts = async () => {
+    await loadDataByFilter(keyFilter);
   };
 
   useEffect(() => {
@@ -75,7 +83,9 @@ export default function Home() {
   return (
     <StyleHome>
       <div className="home_content-container">
-        <FilterPost onChangeFilter={handleFilterChange} />
+        <FilterPost 
+          onChangeFilter={handleFilterChange} 
+          nameFilter={nameFilter}/>
         <div
           id="scrollableDiv"
           className="cartPost_main"
@@ -92,13 +102,29 @@ export default function Home() {
           >
             <List
               dataSource={data}
-              renderItem={(item: any) => (
-                <Post 
-                  data={item} 
-                  key={item._id}
-                  infoUser={infoUser}
-                />
-              )}
+              renderItem={(item: any) => {
+                const isHiddenByAdmin = item.status === "HIDDEN";
+                const isMyHiddenPost = infoUser?.blockedUsers.includes(item.userId?._id);
+
+                if (isHiddenByAdmin || isMyHiddenPost) {
+                  return (
+                    <div
+                      key={item._id}
+                      className="bg-gray-100 text-gray-500 italic text-center p-4 rounded-md mb-4"
+                    >
+                      This post has been hidden {isHiddenByAdmin && "By admin"} {isMyHiddenPost && "By block"}
+                    </div>
+                  );
+                }
+                return (
+                  <Post
+                    data={item}
+                    key={item._id}
+                    infoUser={infoUser}
+                    refreshPosts={refreshPosts}
+                  />
+                );
+              }}
             />
           </InfiniteScroll>
         </div>

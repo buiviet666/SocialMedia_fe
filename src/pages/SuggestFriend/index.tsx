@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import styled from 'styled-components';
-import CartUser from '../../components/CartUser';
-import userApi from '../../apis/api/userApi';
-import toast from 'react-hot-toast';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useState } from "react";
+import CartUser from "../../components/CartUser";
+import userApi from "../../apis/api/userApi";
+import toast from "react-hot-toast";
 
 const SuggestFriend = () => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -13,7 +13,8 @@ const SuggestFriend = () => {
         const res = await userApi.getRecommendedUsers();
         setSuggestions(res.data || []);
       } catch (err) {
-        toast.error("Lỗi khi lấy danh sách gợi ý");
+        toast.error("Error getting suggestion list");
+        console.log(err);
       }
     };
 
@@ -21,68 +22,25 @@ const SuggestFriend = () => {
   }, []);
 
   return (
-    <StyleSuggestFriend>
-      <div className="wrapper">
-        <h2>Gợi ý cho bạn</h2>
-        <div className="list">
+    <div className="flex justify-center px-4 py-6">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-md p-5">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">
+          Friend suggestions
+        </h2>
+        <div className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300">
           {suggestions.length > 0 ? (
             suggestions.map((user) => (
               <CartUser dataItem={user} key={user._id} size="small" />
             ))
           ) : (
-            <p className="empty">Không có gợi ý nào lúc này.</p>
+            <p className="text-center text-gray-400 italic text-sm">
+              No suggestions at this time.
+            </p>
           )}
         </div>
       </div>
-    </StyleSuggestFriend>
+    </div>
   );
 };
 
 export default SuggestFriend;
-
-const StyleSuggestFriend = styled.div`
-  display: flex;
-  justify-content: center;
-  padding: 24px;
-
-  .wrapper {
-    width: 100%;
-    max-width: 400px;
-    background-color: #fff;
-    padding: 16px;
-    border-radius: 12px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  }
-
-  h2 {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 16px;
-    color: #333;
-  }
-
-  .list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    max-height: 70vh;
-    overflow-y: auto;
-  }
-
-  .list::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .list::-webkit-scrollbar-thumb {
-    background-color: #ccc;
-    border-radius: 10px;
-  }
-
-  .empty {
-    text-align: center;
-    color: #999;
-    font-style: italic;
-    font-size: 14px;
-    padding: 12px;
-  }
-`;

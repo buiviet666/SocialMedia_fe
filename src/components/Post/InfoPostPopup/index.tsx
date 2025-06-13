@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Avatar, Divider } from 'antd';
-import { CloseOutlined, CrownOutlined, HeartFilled, HeartOutlined, MessageOutlined, SendOutlined, SmileOutlined, UserOutlined } from '@ant-design/icons';
+import { CloseOutlined, HeartFilled, HeartOutlined, MessageOutlined, SendOutlined, SmileOutlined, UserOutlined } from '@ant-design/icons';
 import Slider from "react-slick";
 import styled from 'styled-components';
 import { settingsDetailPost } from '../../../constants/sliderSetting';
@@ -14,6 +14,7 @@ import SharePost from '../SharePost';
 import LikeListModal from '../LikeListModal';
 import CommentItem from '../CommentItem';
 import { RiShareForward2Fill } from 'react-icons/ri';
+import { FaRegBookmark } from 'react-icons/fa';
 
 interface InfoPostPopupProps {
   open: boolean;
@@ -248,11 +249,10 @@ const InfoPostPopup = ({ open, onClose, data, commentData, infoUser, getDataList
 
                 <span className='cursor-pointer' style={{ fontSize: "26px", padding: "7px" }} onClick={() => setIsShareOpen(true)}>
                   <RiShareForward2Fill />
-
                 </span>
               </div>
               <div className="cartpost_title-save">
-                <CrownOutlined
+                <FaRegBookmark
                   onClick={toggleSave}
                   style={{
                     fontSize: "26px",
@@ -280,14 +280,14 @@ const InfoPostPopup = ({ open, onClose, data, commentData, infoUser, getDataList
               className="likes cursor-pointer"
               onClick={() => handleGetListLiked()}
             >
-              {likesCount || 0} lượt thích
+              {likesCount || 0} like
             </div>
 
             <div className="flex items-center mt-3 gap-2">
               <input
                 ref={inputRef}
                 className="flex-1 border-none outline-none pr-3 placeholder:text-gray-400 placeholder:text-sm"
-                placeholder="Thêm bình luận..."
+                placeholder="More comment..."
                 value={valueInput}
                 onChange={handleInputChange}
                 onClick={() =>
@@ -477,6 +477,11 @@ const StyledModal = styled(Modal)`
 
   .ant-divider {
     margin: 12px 0;
+  }
+
+  .cartpost_title-save svg {
+    width: 40px;
+    height: 40px;
   }
 `;
 

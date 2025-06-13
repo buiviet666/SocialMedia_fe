@@ -13,6 +13,7 @@ import logoPhoto from '../../../assets/photo.svg';
 import { ValidateMessage } from "../../../utils/validateMessage";
 import { FaGlobeAsia, FaLock, FaUser, FaUserFriends } from "react-icons/fa";
 import { LiaUserFriendsSolid } from "react-icons/lia";
+import { useNavigate } from "react-router-dom";
 
 type Props = {
   setHasData?: (hasData: boolean) => void;
@@ -23,6 +24,9 @@ type Props = {
   setValue: UseFormSetValue<any>;
   selectedFriends?: any;
   setSelectedFriends: (list: any) => void;
+  dataInfoUser?: any;
+  setIsModalOpen: (state: boolean) => void;
+  resetForm: () => void;
 };
 
 const CreatePost = ({
@@ -33,12 +37,17 @@ const CreatePost = ({
   control,
   setValue,
   selectedFriends,
-  setSelectedFriends
+  setSelectedFriends,
+  dataInfoUser,
+  setIsModalOpen,
+  resetForm
 }: Props) => {
   const [showPopup, setShowPopup] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [friendsList, setFriendsList] = useState<any[]>([]);
+  console.log("dataInfoUser", dataInfoUser);
+  const navigate = useNavigate();
 
 
   const content = useWatch({ control, name: "content" });
@@ -227,6 +236,12 @@ const CreatePost = ({
     }
   ];
 
+  const handleClickProfile = () => {
+    navigate(`/profile`);
+    setIsModalOpen(false);
+    resetForm();
+  }
+
   return (
     <CreateStyled>
       {step === "select" ? (
@@ -295,8 +310,13 @@ const CreatePost = ({
           </div>
           <div className="flex-3 p-4" style={{ maxWidth: 350}}>
             <div className="flex flex-row items-center mb-2">
-              <Avatar size="default" icon={<UserOutlined />} />
-              <span className="ml-1.5 font-semibold">name</span>
+              <Avatar 
+                size="default" 
+                icon={<UserOutlined />} 
+                src={dataInfoUser?.avatar}/>
+              <span className="ml-1.5 font-semibold cursor-pointer" onClick={() => handleClickProfile()}>
+                {dataInfoUser?.nameDisplay ||dataInfoUser?.userName || ""}
+              </span>
             </div>
 
             <Controller

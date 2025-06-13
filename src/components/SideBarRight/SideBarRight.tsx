@@ -1,22 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import styled from "styled-components";
-import Footer from "../Footer";
-import CartUser from "../CartUser";
 import { Avatar, Spin } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import userApi from "../../apis/api/userApi";
 import { useEffect, useState } from "react";
 import moment from "moment";
 import toast from "react-hot-toast";
+import userApi from "../../apis/api/userApi";
+import Footer from "../Footer";
+import CartUser from "../CartUser";
 
 interface Props {
   data?: any;
 }
 
-export default function SideBarRight({data}: Props) {
+export default function SideBarRight({ data }: Props) {
   const navigate = useNavigate();
   const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
+  const [avatarError, setAvatarError] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -27,14 +27,11 @@ export default function SideBarRight({data}: Props) {
         const rawUsers = res?.data || [];
         const topFive = rawUsers.slice(0, 5).map((user: any) => ({
           _id: user._id || user.id,
-          avatar:
-            !user.avatar || user.avatar === <UserOutlined />
-              ? ""
-              : user.avatar,
+          avatar: typeof user.avatar === "string" ? user.avatar : "",
           name: user.nameDisplay || user.userName,
-          des: '',
+          des: "",
           isFollowing: user.isFollowing || false,
-          bio: user?.bio
+          bio: user?.bio,
         }));
         setSuggestedUsers(topFive);
       } catch (error) {
@@ -49,127 +46,61 @@ export default function SideBarRight({data}: Props) {
   }, []);
 
   return (
-    <StyleSideBarRight>
-      <div className="user_profile">
+    <div className="mt-9 pl-8 max-w-sm w-full flex flex-col gap-6">
+      <div className="flex items-center gap-4 px-4">
         <Avatar
           size="large"
-          src={data?.avatar}
-          icon={!data?.avatar && <UserOutlined />}
+          src={!avatarError && data?.avatar ? data.avatar : undefined}
+          icon={<UserOutlined />}
+          onError={() => {
+            setAvatarError(true);
+            return false;
+          }}
         />
-        <div className="user_info">
-          <span className="user_name" onClick={() => navigate("/profile")}>
-            {data?.nameDisplay || data?.userName || 'Người dùng'}
+        <div className="flex flex-col">
+          <span
+            className="font-semibold text-sm text-gray-800 cursor-pointer hover:underline"
+            onClick={() => navigate("/profile")}
+          >
+            {data?.nameDisplay || data?.userName || "Người dùng"}
           </span>
-          <span className="user_location">
+          <span className="text-xs text-gray-500">
             {data?.createdAt
-              ? `Member from ${moment(data.createdAt).format('MMMM YYYY')}`
-              : 'Đang tải thông tin...'}
+              ? `Member since ${moment(data.createdAt).format("MMMM YYYY")}`
+              : "Loading information..."}
           </span>
         </div>
       </div>
 
-      <div className="suggest_list">
-        <div className="suggest_header">
-          <span>Suggestions for you</span>
-          <button onClick={() => navigate("/suggest-friend")}>View all</button>
+      <div className="px-4">
+        <div className="flex justify-between items-center mb-3">
+          <span className="text-sm text-gray-500 font-semibold">
+            Suggestions for you
+          </span>
+          <button
+            className="cursor-pointer text-xs text-blue-500 hover:underline"
+            onClick={() => navigate("/suggest-friend")}
+          >
+            View all
+          </button>
         </div>
 
-        <div className="suggest_users">
+        <div className="flex flex-col gap-2">
           {loading ? (
             <Spin />
           ) : suggestedUsers.length > 0 ? (
             suggestedUsers.map((user) => (
-              <CartUser dataItem={user} key={user._id} size="small" />
+              <CartUser dataItem={user} key={user._id} size="medium" />
             ))
           ) : (
-            <div className="no_suggestion">Không có gợi ý nào</div>
+            <div className="text-sm text-gray-400 text-center py-3">
+              No suggestions
+            </div>
           )}
         </div>
       </div>
 
       <Footer />
-    </StyleSideBarRight>
+    </div>
   );
 }
-
-const StyleSideBarRight = styled.div`
-  margin-top: 36px;
-  padding-left: 32px;
-  max-width: 380px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  width: 100%;
-
-  .user_profile {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 16px;
-  }
-
-  .user_info {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .user_name {
-    font-weight: 600;
-    font-size: 14px;
-    color: #262626;
-    cursor: pointer;
-  }
-
-  .user_name:hover {
-    text-decoration: underline;
-  }
-
-  .user_location {
-    font-size: 12px;
-    color: #888;
-  }
-
-  .suggest_list {
-    padding: 0 16px;
-  }
-
-  .suggest_header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-
-    span {
-      font-size: 14px;
-      color: #888;
-      font-weight: 600;
-    }
-
-    button {
-      font-size: 12px;
-      color: #1890ff;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-
-  .suggest_users {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .no_suggestion {
-    font-size: 13px;
-    color: #999;
-    text-align: center;
-    padding: 12px 0;
-  }
-
-`;

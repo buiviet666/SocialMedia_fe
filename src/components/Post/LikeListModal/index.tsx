@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Modal } from "antd";
 import CartUser from "../../CartUser";
 
@@ -13,19 +14,27 @@ interface Props {
   open: boolean;
   onClose: () => void;
   users: UserLike[];
+  infoUser: any;
 }
 
-const LikeListModal = ({ open, onClose, users }: Props) => {
+const LikeListModal = ({ open, onClose, users, infoUser }: Props) => {
+  console.log("users", users);
+  
   return (
     <Modal
-      title="Danh sách người đã thích"
+      title="List of people who liked"
       open={open}
       onCancel={onClose}
       footer={null}
       centered
     >
       {users.map((user) => (
-        <CartUser key={user._id} dataItem={user} size="small" />
+        <CartUser 
+          key={user._id} 
+          dataItem={user} 
+          size="small" 
+          infoUser={infoUser}
+        />
       ))}
     </Modal>
   );

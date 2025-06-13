@@ -1,18 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EllipsisOutlined, HeartFilled, HeartOutlined, SendOutlined } from '@ant-design/icons';
-import { Avatar, Dropdown, Input, MenuProps, Modal } from 'antd';
+import { Avatar, Dropdown, MenuProps } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { formatTimeFromNow } from '../../../utils/functionCommon';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import postApi from '../../../apis/api/postApi';
+import ModalReport from '../../Modal/ModalReport';
+
+const reasonReport = [
+    'Spam or irrelevant content',
+    'Offensive language',
+    'Harassment',
+    'Hate speech',
+    'Other',
+];
 
 type Props = {
     data?: any;
     currentUserId?: string;
     onDelete: (commentId: string) => void;
-    onReport: (commentId: string, reasonReport: string) => void;
+    onReport: (params: { targetId: string; reason: string }) => void;
     onToggleLike: (commentId: string) => void;
     onReply: (parentId: string, content: string) => void;
     dataComment: any;
@@ -22,7 +31,6 @@ const ReplyCommentItem = ({data, currentUserId, onDelete, onReport, onToggleLike
     const [showReplyInput, setShowReplyInput] = useState(false);
     const [replyContent, setReplyContent] = useState("");
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-    const [reportReason, setReportReason] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
     const [isLike, setIsLike] = useState<boolean>(false);
     const [countLike, setCountLike] = useState<number>(0);
@@ -161,25 +169,19 @@ const ReplyCommentItem = ({data, currentUserId, onDelete, onReport, onToggleLike
                 )}
             </div>
         </div>
-        <Modal
-            title="Report comment"
+
+        <ModalReport
             open={isReportModalOpen}
-            onOk={() => onReport(data._id, reportReason)}
-            onCancel={() => {
-                setIsReportModalOpen(false);
-                setReportReason("");
+            onClose={() => setIsReportModalOpen(false)}
+            onSubmit={({ reason }) => {
+            onReport({ targetId: data._id, reason });
+            setIsReportModalOpen(false);
             }}
-            okText="Submit report"
-            cancelText="Cancel"
-            >
-            <p>Enter the reason you want to report this comment:</p>
-            <Input.TextArea
-                value={reportReason}
-                onChange={(e) => setReportReason(e.target.value)}
-                rows={4}
-                placeholder="Enter reason..."
-            />
-            </Modal>
+            targetId={data._id}
+            targetType="COMMENT"
+            title="Report Comment"
+            reportReasons={reasonReport}
+        />
     </StyleReplyCommentItem>
   )
 }

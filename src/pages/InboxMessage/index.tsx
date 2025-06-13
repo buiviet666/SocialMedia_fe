@@ -11,6 +11,15 @@ import socket from "../../utils/socket";
 import { MdClose, MdOutlineMoreVert } from "react-icons/md";
 import { FaCheck } from "react-icons/fa";
 import MessageList from "../../components/MessageList";
+import ModalReport from "../../components/Modal/ModalReport";
+
+const reasonReport = [
+  "Spam or inappropriate content",
+  "Harassment",
+  "Threatening or abusive",
+  "Hate speech",
+  "Other",
+]
 
 const InboxMessage = () => {
   const { id } = useParams();
@@ -478,6 +487,27 @@ const InboxMessage = () => {
     };
   }, []);
 
+  const handleReportMessage = async ({targetId, reason}: {
+    targetId: string;
+    reason: string;
+  }) => {
+    if (!reason.trim()) {
+      toast.error("Please select a reason");
+      return;
+    }
+    try {
+      await messageApi.reportMessage({
+        messageId: targetId,
+        reason,
+      });
+      toast.success("Message has been reported.");
+      setReportModal({ open: false, messageId: null });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to report message.");
+    }
+  };
+
+
 
   if (loading) return <div>Đang tải dữ liệu...</div>;
   
@@ -629,35 +659,17 @@ const InboxMessage = () => {
           <div className="no-selection">Chọn người để bắt đầu trò chuyện</div>
         )}
       </div>
-      <Modal
-        title="Báo cáo tin nhắn"
+      <ModalReport
         open={reportModal.open}
-        onCancel={() => setReportModal({ open: false, messageId: null })}
-        onOk={async () => {
-          if (!reportReason.trim()) {
-            toast.error("Vui lòng nhập lý do báo cáo");
-            return;
-          }
-          try {
-            await messageApi.reportMessage({
-              messageId: reportModal.messageId!,
-              reason: reportReason.trim(),
-            });
-            toast.success("Đã báo cáo tin nhắn");
-            setReportModal({ open: false, messageId: null });
-            setReportReason("");
-          } catch (err: any) {
-            toast.error(err.response?.data?.message || "Lỗi báo cáo");
-          }
-        }}
-      >
-        <Input.TextArea
-          rows={4}
-          placeholder="Nhập lý do báo cáo..."
-          value={reportReason}
-          onChange={(e) => setReportReason(e.target.value)}
-        />
-      </Modal>
+        onClose={() => setReportModal({ open: false, messageId: null })}
+        onSubmit={({ targetId, reason }) =>
+          handleReportMessage({ targetId, reason })
+        }
+        targetId={reportModal.messageId || ""}
+        targetType="MESSAGE"
+        title="Report Message"
+        reportReasons={reasonReport}
+      />
     </StyleInboxMessage>
   );
 };

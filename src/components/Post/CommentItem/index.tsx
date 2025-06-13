@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Avatar, Dropdown, Input, Modal } from "antd";
+import { Avatar, Dropdown } from "antd";
 import { EllipsisOutlined, HeartOutlined, HeartFilled, SendOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { formatTimeFromNow } from "../../../utils/functionCommon";
@@ -8,6 +8,17 @@ import toast from "react-hot-toast";
 import ReplyCommentItem from "../ReplyCommentItem";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
+import ModalReport from "../../Modal/ModalReport";
+import { FaCheck } from "react-icons/fa";
+import { RiCloseFill } from "react-icons/ri";
+import { GrFormClose } from "react-icons/gr";
+
+const reasonReport = [
+  "Offensive or abusive language",
+  "Spam or irrelevant content",
+  "Harassment or bullying",
+  "Other"
+]
 
 interface Props {
   comment?: any;
@@ -26,7 +37,6 @@ const CommentItem = ({ comment, currentUserId, dataPost, getDataListCmt }: Props
   const [isLikedCmt, setIsLikedCmt] = useState<boolean>(false);
   const [likesCmtCount, setLikesCmtCount] = useState<number>(0);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [reportReason, setReportReason] = useState("");
   const [countCmtReply, setCountCmtReply] = useState<number>(comment?.totalReplies)
   const isOwnComment = currentUserId === comment?.userId?._id;
   const navigate = useNavigate();
@@ -121,17 +131,23 @@ const CommentItem = ({ comment, currentUserId, dataPost, getDataListCmt }: Props
     }
   }
 
-  const handleConfirmReport = async (idCmt: string, reportReason: string) => {
-    if (!reportReason.trim()) {
-      return toast.error("Please enter reason.");
+  const handleReportComment = async ({
+    targetId,
+    reason,
+  }: {
+    targetId: string;
+    reason: string;
+  }) => {
+    if (!reason.trim()) {
+      return toast.error("Please select a reason.");
     }
+
     try {
-      const res: any = await postApi.reportComment(idCmt, reportReason);
-      toast.success(res?.message);
+      const res: any = await postApi.reportComment(targetId, reason);
+      toast.success(res?.message || "Report sent.");
       setIsReportModalOpen(false);
-      setReportReason("");
     } catch (error) {
-      console.log(error);
+      console.error(error);
       toast.error("Unable to send report.");
     }
   };
@@ -189,13 +205,13 @@ const CommentItem = ({ comment, currentUserId, dataPost, getDataListCmt }: Props
                 className="text-green-600 cursor-pointer"
                 onClick={() => handleUpdateCmt()}
               >
-                ✔
+                <FaCheck />
               </span>
               <span
                 className="text-gray-500 cursor-pointer"
                 onClick={() => setIsEditing(false)}
               >
-                ✖
+                <GrFormClose className="w-[24px] h-[24px]"/>
               </span>
             </div>
           )}
@@ -213,7 +229,7 @@ const CommentItem = ({ comment, currentUserId, dataPost, getDataListCmt }: Props
         </div>
 
 
-        <div className="flex items-center text-xs text-gray-500 mt-1 gap-4 ml-2">
+        <div className="flex items-center text-xs text-gray-500 mt-1 gap-4 ml-2 whitespace-nowrap">
           <span
             className="cursor-pointer hover:underline flex items-center gap-1"
             onClick={() => onToggleLikeCmt(comment._id)}
@@ -229,7 +245,7 @@ const CommentItem = ({ comment, currentUserId, dataPost, getDataListCmt }: Props
             onClick={() => setShowReplyInput(!showReplyInput)}
             className="cursor-pointer hover:underline"
           >
-            Trả lời
+            Reply
           </span>
           <span>{formatTimeFromNow(comment.createdAt)}</span>
         </div>
@@ -272,33 +288,24 @@ const CommentItem = ({ comment, currentUserId, dataPost, getDataListCmt }: Props
               currentUserId={currentUserId}
               onReply={handleReplyCmt}
               onDelete={handleDelete}
-              onReport={handleConfirmReport}
+              onReport={handleReportComment}
               onToggleLike={onToggleLikeCmt}
               dataComment={comment}
             />
           ))}
         </div>}
-        
       </div>
-      <Modal
-        title="Report comment"
+      <ModalReport
         open={isReportModalOpen}
-        onOk={() => handleConfirmReport(comment._id, reportReason)}
-        onCancel={() => {
-          setIsReportModalOpen(false);
-          setReportReason("");
-        }}
-        okText="Submit report"
-        cancelText="Cancel"
-      >
-        <p>Enter the reason you want to report this comment:</p>
-        <Input.TextArea
-          value={reportReason}
-          onChange={(e) => setReportReason(e.target.value)}
-          rows={4}
-          placeholder="Enter reason..."
-        />
-      </Modal>
+        onClose={() => setIsReportModalOpen(false)}
+        onSubmit={({ targetId, reason }) =>
+          handleReportComment({ targetId, reason })
+        }
+        targetId={comment._id}
+        targetType="COMMENT"
+        reportReasons={reasonReport}
+        title="Report Comment"
+      />
     </StyleCommentItem>
   );
 };

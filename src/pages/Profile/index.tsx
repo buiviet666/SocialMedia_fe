@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import styled from "styled-components";
-import { Avatar, Button, Dropdown, Modal, Tabs, TabsProps, message } from "antd";
+import { Avatar, Button, Dropdown, Modal, Tabs, TabsProps } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 import { MoreOutlined, UserOutlined } from "@ant-design/icons";
 import TabContentProfile from "./TabContentProfile";
@@ -12,6 +12,15 @@ import toast from "react-hot-toast";
 import EmptyTab from "./TabContentProfile/EmtyTab";
 import reportApi from "../../apis/api/reportApi";
 import ModalListUser from "./ModalListUser";
+import ModalReport from "../../components/Modal/ModalReport";
+
+const reasonReport = [
+    "Fake account",
+    "Spam or scam",
+    "Hate speech or abusive language",
+    "Inappropriate content",
+    "Other",
+  ]
 
 const Profile = () => {
   const { id } = useParams();
@@ -30,14 +39,8 @@ const Profile = () => {
   const [followList, setFollowList] = useState<any[]>([]);
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [reportReason, setReportReason] = useState("");
   const navigate = useNavigate();
   const isMe = !id;
-  
-  // console.log("inforUser", inforCurrentUser);
-  // console.log("isFollowing", isFollowing);
-  // console.log("isBlocked", isBlocked);
-  // console.log("followList", followList);
   
   const items: TabsProps["items"] = [
     {
@@ -115,18 +118,18 @@ const Profile = () => {
     }
   };
 
-  const handleToggleFollow = async (targetId: string) => {
+  const handleToggleFollow = async () => {
     try {
       if (isFollowing) {
-        await userApi.unfollowUser(targetId);
+        await userApi.unfollowUser(userInfo._id);
         toast.success("Unfollowed");
         setIsFollowing(false);
       } else {
-        await userApi.followUser(targetId);
+        await userApi.followUser(userInfo._id);
         toast.success("Followed");
         setIsFollowing(true);
       }
-      const res = await userApi.getUserById(targetId);
+      const res = await userApi.getUserById(userInfo._id);
       setUserInfo(res?.data);
     } catch {
       toast.error("Unable to perform tracking operation");
@@ -156,22 +159,19 @@ const Profile = () => {
     }
   };
 
-  const handleReportUser = async () => {
+  const handleReportUser = async (data: { targetId: string; reason: string }) => {
     try {
-      if (!reportReason.trim()) {
-        return message.warning("Vui lòng nhập lý do báo cáo");
+      const { targetId, reason } = data;
+      if (!reason.trim()) {
+        return toast.error("Please enter reason for reporting!");
       }
 
-      await reportApi.reportUser({ targetUserId: id!, reason: reportReason });
-      message.success("Đã gửi báo cáo người dùng");
+      await reportApi.reportUser({ targetUserId: targetId, reason });
+      toast.success("User report sent");
       setIsReportModalOpen(false);
-      setReportReason("");
     } catch (error: any) {
-      if (error?.response?.status === 409) {
-        message.warning("Bạn đã báo cáo người dùng này trước đó");
-      } else {
-        message.error("Báo cáo thất bại");
-      }
+      console.log(error);
+      toast.error("Unable to operation");
     }
   };
 
@@ -210,20 +210,20 @@ const Profile = () => {
   }, [id]);
 
   useEffect(() => {
-  if (inforCurrentUser && userInfo) {
-    const blocked = inforCurrentUser?.blockedUsers?.includes(userInfo._id);
-    const following = userInfo?.followers?.some((f: any) => f._id === inforCurrentUser._id);
+    if (inforCurrentUser && userInfo) {
+      const blocked = inforCurrentUser?.blockedUsers?.includes(userInfo._id);
+      const following = userInfo?.followers?.some((f: any) => f._id === inforCurrentUser._id);
 
-    setIsBlocked(blocked);
-    setIsFollowing(following);
+      setIsBlocked(blocked);
+      setIsFollowing(following);
 
-    if (blocked) {
-      toast.error("This user has been blocked");
-      setPosts([]);
-      setSharedPosts([]);
+      if (blocked) {
+        toast.error("This user has been blocked");
+        setPosts([]);
+        setSharedPosts([]);
+      }
     }
-  }
-}, [inforCurrentUser, userInfo]);
+  }, [inforCurrentUser, userInfo]);
 
   return (
     <StyleProfile>
@@ -231,8 +231,16 @@ const Profile = () => {
         <div className="profile-header">
           <Avatar
             size={100}
-            src={isMe ? inforCurrentUser?.avatar : userInfo?.avatar && <UserOutlined />}
-            icon={isMe ? inforCurrentUser?.avatar : !userInfo?.avatar && <UserOutlined />}
+            src={
+              isMe
+                ? inforCurrentUser?.avatar || undefined
+                : userInfo?.avatar || undefined
+            }
+            icon={
+              (isMe && !inforCurrentUser?.avatar) || (!isMe && !userInfo?.avatar)
+                ? <UserOutlined />
+                : undefined
+            }
             className="profile-avatar"
           />
           <div className="profile-info">
@@ -249,7 +257,7 @@ const Profile = () => {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Button
                     type={isFollowing ? "default" : "primary"}
-                    onClick={() => handleToggleFollow(userInfo._id)}
+                    onClick={() => handleToggleFollow()}
                   >
                     {isFollowing ? "Unfollow" : "Follow"}
                   </Button>
@@ -300,7 +308,6 @@ const Profile = () => {
         <Footer />
       </div>
 
-      {/* Modal hiển thị danh sách followers/following */}
       <Modal
         open={showPopup}
         onCancel={() => setShowPopup(false)}
@@ -324,22 +331,18 @@ const Profile = () => {
           setShowPopup={setShowPopup}
         />
       </Modal>
-      <Modal
+
+      <ModalReport
         open={isReportModalOpen}
-        onCancel={() => setIsReportModalOpen(false)}
-        onOk={handleReportUser}
-        okText="Gửi báo cáo"
-        cancelText="Hủy"
-        title="Báo cáo người dùng"
-        centered
-      >
-        <textarea
-          value={reportReason}
-          onChange={(e) => setReportReason(e.target.value)}
-          placeholder="Nhập lý do báo cáo..."
-          className="w-full border border-gray-300 rounded-lg p-2 min-h-[100px] outline-none focus:ring focus:ring-blue-200"
-        />
-      </Modal>
+        onClose={() => setIsReportModalOpen(false)}
+        onSubmit={({targetId, reason}) => {
+          handleReportUser({targetId, reason})
+        }}
+        targetId={id!}
+        targetType="USER"
+        reportReasons={reasonReport}
+        title="Report Post"
+      />
     </StyleProfile>
   );
 };

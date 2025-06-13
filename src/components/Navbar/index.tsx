@@ -27,6 +27,7 @@ import toast from "react-hot-toast";
 import logoMain from '../../../logoMain.svg';
 import Message from "../Message";
 import postApi from "../../apis/api/postApi";
+import userApi from "../../apis/api/userApi";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -41,8 +42,7 @@ const Navbar = () => {
   const [step, setStep] = useState<"select" | "compose">("select");
   const [images, setImages] = useState<File[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
-
-console.log("selectedFriends", selectedFriends);
+  const [dataInfoUser, setDataInfoUser] = useState(null);
 
   const navigate = useNavigate();
 
@@ -57,6 +57,18 @@ console.log("selectedFriends", selectedFriends);
       privacy: 'PUBLIC'
     },
   });
+
+  const getInfoUserApi = async () => {
+    try {
+      const res: any = await userApi.getCurrentUser();
+      if (res?.statusCode === 200) {
+        setDataInfoUser(res?.data);
+      }
+    } catch (error) {
+      toast.error("Error when getting current user");
+      console.log(error);
+    }
+  };
 
   const handleLogout = async () => {
     const refreshToken =
@@ -235,12 +247,19 @@ console.log("selectedFriends", selectedFriends);
           setValue={setValue}
           selectedFriends={selectedFriends}
           setSelectedFriends={setSelectedFriends}
+          dataInfoUser={dataInfoUser}
+          setIsModalOpen={setIsModalOpen}
+          resetForm={resetForm}
         />
       ),
       title: "Tạo bài viết mới",
     },
     { icon: <UserOutlined />, path: "/profile", component: <Profile /> },
   ];
+
+  useEffect(() => {
+    getInfoUserApi();
+  }, []);
 
   return (
     <StyleMainNavbarPC>
@@ -320,7 +339,10 @@ console.log("selectedFriends", selectedFriends);
             control,
             setValue,
             setSelectedFriends,
-            selectedFriends
+            selectedFriends,
+            dataInfoUser,
+            setIsModalOpen,
+            resetForm
           })}
       </ModalStyled>
       <Modal

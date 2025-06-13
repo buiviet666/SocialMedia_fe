@@ -1,48 +1,109 @@
-import React, { useEffect, useState, useRef } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import styled from "styled-components";
-import { Spin, Avatar, Input, Button } from "antd";
-import {
-  UserOutlined,
-  HeartFilled,
-  HeartOutlined,
-  MessageOutlined,
-  SendOutlined,
-  SmileOutlined,
-} from "@ant-design/icons";
+import { Avatar, Input, Button, Spin, InputRef, Divider } from "antd";
+import { HeartOutlined, HeartFilled, MessageOutlined, SendOutlined, SmileOutlined, UserOutlined, CloseOutlined } from "@ant-design/icons";
+import EmojiPicker from "emoji-picker-react";
+import Slider from "react-slick";
 import moment from "moment";
 import postApi from "../../apis/api/postApi";
-import EmojiPicker from "emoji-picker-react";
-import toast from "react-hot-toast";
 import LikeListModal from "../../components/Post/LikeListModal";
+import toast from "react-hot-toast";
+import { settingsDetailPost } from "../../constants/sliderSetting";
+import styled from "styled-components";
+import userApi from "../../apis/api/userApi";
+import { FaRegBookmark } from "react-icons/fa";
+import CommentItem from "../../components/Post/CommentItem";
+import { RiShareForward2Fill } from "react-icons/ri";
+import SharePost from "../../components/Post/SharePost";
 
 const PostInfo = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const [post, setPost] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
-  const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
-  const [likeUsers, setLikeUsers] = useState([]);
+  const [isLiked, setIsLiked] = useState(false);
   const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
+  const [likeUsers, setLikeUsers] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [listComment, setListComment] = useState<any[]>([]);
+  const [infoUser, setInfoUser] = useState<any>(null);
+  const [isSaved, setIsSaved] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const inputRef = useRef<InputRef>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
-  const currentUserId = localStorage.getItem("userId");
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const navigate = useNavigate();
 
-  const fetchPost = async () => {
+  useEffect(() => {
+    if (post?.likes) {
+      setIsLiked(post.likes.includes(infoUser?._id));
+      setLikesCount(post.likes.length);
+    }
+
+    if (infoUser?.savedPosts) {
+      setIsSaved(infoUser?.savedPosts.includes(post?._id));
+    }
+  }, [post?.likes, infoUser, infoUser?.savedPosts, infoUser?.savedPosts, post?._id]);
+
+  useEffect(() => {
+    const fetchPost = async () => {
+      try {
+        const res: any = await postApi.getPostById(id!);
+        setPost(res.data);
+        setLikesCount(res.data.likes?.length || 0);
+        setIsLiked(res.data.likes?.includes(id));
+      } catch (error) {
+        toast.error("Failed to fetch post");
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPost();
+  }, [id]);
+
+  const getDataListCmt = async () => {
     try {
-      const res: any = await postApi.getPostById(id!);
-      setPost(res.data);
-      setLikesCount(res.data.likes?.length || 0);
-      setIsLiked(res.data.likes?.includes(currentUserId));
-    } catch (err) {
-      setError("Không lấy được thông tin bài viết.");
-    } finally {
-      setLoading(false);
+      const res: any = await postApi.getCommentsByPost(id!);
+      if (res?.statusCode === 200) {
+        setListComment(res?.data);
+      }
+    } catch (error) {
+      toast.error("Operation failed!");
+      console.log(error);
+    }
+  }
+
+  const fetchCurrentUser = async () => {
+    try {
+      const res: any = await userApi.getCurrentUser();
+      if (res?.statusCode === 200) {
+        setInfoUser(res?.data);
+      } else {
+        toast.error(res?.message || "Error");
+      }
+    } catch (error) {
+      console.error("Không thể lấy thông tin người dùng:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCurrentUser();
+    getDataListCmt();
+  }, []);
+
+  const toggleLike = async () => {
+    try {
+      const res: any = await postApi.toggleLike({ postId: post._id });
+      if (res.message === "Like") setIsLiked(true);
+      else setIsLiked(false);
+      setLikesCount(res.totalLikes || 0);
+    } catch {
+      console.error("Failed to like post");
     }
   };
 
@@ -51,22 +112,8 @@ const PostInfo = () => {
       const res = await postApi.getPostLikes(post._id);
       setLikeUsers(res.data);
       setIsLikeModalOpen(true);
-    } catch (err) {
-      toast.error("Không thể tải danh sách lượt thích.");
-    }
-  };
-
-  const toggleLike = async () => {
-    try {
-      const res: any = await postApi.toggleLike({ postId: post._id });
-      if (res?.message === "Like") {
-        setIsLiked(true);
-      } else {
-        setIsLiked(false);
-      }
-      setLikesCount(res?.totalLikes || 0);
-    } catch (err) {
-      toast.error("Không thể thích/bỏ thích bài viết.");
+    } catch {
+      console.error("Failed to fetch likes");
     }
   };
 
@@ -84,108 +131,191 @@ const PostInfo = () => {
     }, 0);
   };
 
-  useEffect(() => {
-    fetchPost();
-  }, [id]);
+  const deleteInput = () => {
+    setNewComment("");
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+  };
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        emojiPickerRef.current &&
-        !emojiPickerRef.current.contains(event.target as Node)
-      ) {
-        setShowEmojiPicker(false);
+  const handleClickProfile = () => {
+    if (id === infoUser?._id) {
+      navigate(`/profile`)
+    } else {
+      navigate(`/profile/${infoUser?._id}`)
+    }
+  }
+
+  const handleSharePost = async (message: string) => {
+    try {
+      const params = {
+        postId: post._id,
+        message
       }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+      await postApi.sharePost(params);
+      toast.success("Shared article successfully!");
+    } catch (err) {
+      toast.error("Cannot share post.");
+      console.log(err);
+    } finally {
+      setIsShareOpen(false);
+    }
+  };
+
+  const toggleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const res: any = await postApi.toggleSave({ postId: post._id });
+      if (res?.message === "Save") {
+        setIsSaved(true);
+        toast.success("Article saved.");
+      } else if (res?.message === "unSave") {
+        setIsSaved(false);
+        toast.success("Post unsaved.");
+      }
+    } catch (err) {
+      toast.error("Unable to save post.");
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmitCmt = async () => {
+    try {
+      const params = {
+        postId: post._id,
+        content: newComment
+      }
+      const res: any = await postApi.createComment(params);
+      if (res?.statusCode === 201) {
+        toast.success(res?.message);
+        setNewComment("");
+        await getDataListCmt();
+      }
+    } catch (error) {
+      toast.error("Operation failed!");
+      console.log(error);
+    }
+  }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Spin size="large" />
-      </div>
-    );
+    return <div className="h-screen flex items-center justify-center"><Spin size="large" /></div>;
   }
-  if (error || !post) {
-    return (
-      <div className="flex items-center justify-center h-screen text-red-500">
-        {error || "Bài viết không tồn tại."}
-      </div>
-    );
+
+  if (!post) {
+    return <div className="h-screen flex items-center justify-center text-red-500">Bài viết không tồn tại.</div>;
   }
 
   return (
-    <Wrapper>
-      <div className="flex flex-row">
-        <div className="left">
-          <img src={post.photoUrls[0]?.url} alt="Post" />
+    <PostInfoStyle className="flex justify-center pt-28">
+      <div className="bg-white shadow-lg rounded-lg flex w-[80%] max-h-[90vh] overflow-hidden border border-gray-300 rounded-md p-3">
+        <div className="flex-1 bg-white w-[50%]">
+          <Slider {...settingsDetailPost}>
+            {post?.photoUrls?.map((item: any, idx: any) => (
+              <img
+                key={idx} 
+                src={item?.url} 
+                alt="post" 
+                className="w-full h-full object-cover" />
+            ))}
+          </Slider>
         </div>
-        <div className="right">
-          <div className="header">
-            <Avatar src={post.userId.avatar} icon={<UserOutlined />} size={48} />
-            <div className="user-info">
-              <div className="username cursor-pointer" onClick={() => navigate(`/profile/${post.userId._id}`)}>{post.userId.username}</div>
-              {post.location && <div className="location">{post.location}</div>}
+
+        <div className="flex-1 flex flex-col pl-3 relative overflow-y-auto">
+          <div className="flex items-center gap-4 pb-2 mb-2">
+            <Avatar src={post.userId.avatar} icon={<UserOutlined />} size={"large"}/>
+            <div>
+              <div className="font-semibold cursor-pointer" onClick={() => handleClickProfile}>
+                {post.userId.nameDisplay || post.userId.userName}
+              </div>
+              {post.location && <div className="text-xs text-gray-500">{post.location}</div>}
             </div>
           </div>
+          <Divider />
 
-          <div className="interactions">
-            {isLiked ? (
-              <HeartFilled style={{ fontSize: 26, color: "#ff4d4f" }} onClick={toggleLike} />
-            ) : (
-              <HeartOutlined style={{ fontSize: 26 }} onClick={toggleLike} />
-            )}
-            <MessageOutlined
-              style={{ fontSize: 26, marginLeft: 12, cursor: "pointer" }}
-              onClick={() => {
-                inputRef.current?.focus();
-                inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
-            />
-            <SmileOutlined
-              style={{ fontSize: 26, marginLeft: 12, cursor: "pointer" }}
-              onClick={() => setShowEmojiPicker((prev) => !prev)}
-            />
-          </div>
-
-          <div
-            className="likes cursor-pointer text-sm"
-            onClick={fetchLikes}
-          >
-            {likesCount} lượt thích
-          </div>
 
           <div className="caption">
-            <span className="font-semibold mr-2">{post.userId.username}</span>
-            {post.content}
+            {listComment.map((comment: any) => (
+                <CommentItem
+                  key={comment._id}
+                  comment={comment}
+                  currentUserId={infoUser?._id}
+                  dataPost={post}
+                  getDataListCmt={getDataListCmt}
+                />
+              ))}
           </div>
 
-          <div className="text-xs text-gray-400 mt-1">
-            {moment(post.createdAt).format("DD/MM/YYYY HH:mm")}
-          </div>
-
-          <div className="add-comment mt-4 flex items-center gap-2">
-            <Input
-              ref={inputRef}
-              placeholder="Thêm bình luận..."
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              onClick={() =>
-                setCursorPosition(inputRef.current?.selectionStart || 0)
-              }
-            />
-            <Button type="primary" disabled={!newComment.trim()}>
-              Đăng
-            </Button>
-          </div>
-
-          {showEmojiPicker && (
-            <div ref={emojiPickerRef} className="absolute z-50 mt-2">
-              <EmojiPicker onEmojiClick={onEmojiClick} />
+          <Divider />
+          <div className="pt-3">
+            <div className="flex justify-between" onClick={toggleLike}>
+              <div className="flex items-center gap-4 mb-2 cursor-pointer iconContainerInteract">
+                {isLiked ? (
+                    <HeartFilled className="colorLike" />
+                  ) : (
+                    <HeartOutlined />
+                  )}
+                <MessageOutlined className="text-xl cursor-pointer" onClick={() => inputRef.current?.focus()} />
+                <span 
+                  className='cursor-pointer' 
+                  onClick={() => setIsShareOpen(true)}>
+                  <RiShareForward2Fill />
+                </span>
+              </div>
+              <div className="cartpost_title-save cursor-pointer">
+                <FaRegBookmark 
+                  onClick={toggleSave}
+                  style={{
+                    color: isSaved ? "#fadb14" : undefined,
+                  }}
+                />
+              </div>
             </div>
-          )}
+            <div className="flex flex-col gap-2 mb-3">
+              <div className="text-base font-semibold text-gray-900 leading-snug">
+                {post?.title}
+              </div>
+              <div className="text-sm text-gray-700 leading-relaxed">
+                {post?.content}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                {moment(post?.createdAt).format('DD/MM/YYYY HH:mm')}
+              </div>
+            </div>
+            <div className="likes cursor-pointer" onClick={fetchLikes}>
+              {likesCount || 0} like
+            </div>
+            <div className="mt-auto pt-3 ">
+              <div className="cartpost_title-comment flex flex-row">
+                <Input
+                  ref={inputRef}
+                  className="customInputContent flex-1 border-none outline-none placeholder:text-gray-400 placeholder:text-sm pr-20"
+                  placeholder="Add comment..."
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onClick={() =>
+                    setCursorPosition(inputRef.current?.input?.selectionStart || 0)
+                  }
+                />
+                <div className="actionInput">
+                  {newComment && (
+                    <>
+                      <CloseOutlined className="text-gray-400 cursor-pointer hover:text-red-500 iconDeleteInput" onClick={deleteInput} />
+                      <SendOutlined onClick={handleSubmitCmt}/>
+                    </>
+                  )}
+                  <SmileOutlined style={{ cursor: "pointer" }} onClick={() => setShowEmojiPicker((prev) => !prev)}/>
+                </div>
+              </div>
+              {showEmojiPicker && (
+                <div ref={emojiPickerRef} className="absolute bottom-14 right-4 z-50">
+                  <EmojiPicker onEmojiClick={onEmojiClick} />
+                </div>
+              )}
+            </div>
+          </div> 
 
           <LikeListModal
             open={isLikeModalOpen}
@@ -194,87 +324,81 @@ const PostInfo = () => {
           />
         </div>
       </div>
-    </Wrapper>
+      <SharePost
+        open={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        onSubmit={handleSharePost}
+      />
+    </PostInfoStyle>
   );
 };
 
 export default PostInfo;
 
-const Wrapper = styled.div`
-  background: #fff;
-  max-height: 100vh;
-  max-width: 80%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  place-self: anchor-center;
-  padding-top: 50px;
-
-  .left {
-    flex: 1;
-    background: #000;
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+const PostInfoStyle = styled.div`
+  .slick-track {
+    display: flex;
   }
 
-  .right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    position: relative;
+  .slick-slide {
+    align-self: center;
   }
 
-  .header {
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid #eaeaea;
-    padding-bottom: 0.5rem;
-    margin-bottom: 0.5rem;
-
-    .user-info {
-      margin-left: 0.75rem;
-
-      .username {
-        font-weight: 600;
-      }
-      .location {
-        font-size: 0.875rem;
-        color: #888;
-      }
-    }
+  .colorLike {
+    color: #ff4d4f !important;
   }
 
   .caption {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #eaeaea;
-    font-size: 0.95rem;
-    color: #333;
+    max-height: 340px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    .username {
+      font-weight: bold;
+      margin-right: 6px;
+    }
   }
 
-  .interactions {
+  .caption::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ant-divider {
+    margin: 0;
+    margin-bottom: 12px;
+  }
+
+  .iconContainerInteract span svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .cartpost_title-save svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .likes {
+    font-weight: 500;
+    display: inline-block;
+  }
+
+  .cartpost_title-comment {
+    position: relative;
+  }
+
+  .actionInput {
+    position: absolute;
+    right: 0;
     display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 0.5rem;
+    flex-direction: row;
+    align-self: center;
+    padding: 0 10px;
+    gap: 6px;
   }
 
-  .add-comment {
-    border-top: 1px solid #eaeaea;
-    padding-top: 0.5rem;
+  .customInputContent {
+    padding-right: 80px;
   }
-
-  @media (max-width: 768px) {
-    flex-direction: column;
-    .left,
-    .right {
-      width: 100%;
-    }
-    .left {
-      height: 300px;
-    }
-  }
-`;
+`

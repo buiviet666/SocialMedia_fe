@@ -12,25 +12,24 @@ export interface CartUserProps {
   onToggleFollow?: () => void;
   onChangeAvatar?: () => void;
   size?: 'small' | 'medium' | 'large';
+  infoUser?: any;
+  refreshCurrentUser?: () => void;
+  setShowPopup?: (state: boolean) => void;
 }
-
-const avatarSizeMap = {
-  small: 40,
-  medium: 64,
-  large: 100,
-};
 
 const CartUser = ({
   dataItem,
   onToggleFollow,
   onChangeAvatar,
   size = 'medium',
+  infoUser,
+  refreshCurrentUser,
+  setShowPopup
 }: CartUserProps) => {
-  const avatarSize = avatarSizeMap[size];
-  const [isFollowing, setIsFollowing] = useState<boolean>(dataItem?.isFollowing || false);
+  const [isFollowing, setIsFollowing] = useState<boolean>(infoUser?.following.includes(dataItem?._id) || false);
   const [loading, setLoading] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
   const navigate = useNavigate();
-  const currentUserId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
 
   const handleFollowToggle = async () => {
     if (!dataItem?._id) return;
@@ -40,10 +39,14 @@ const CartUser = ({
       if (isFollowing) {
         await userApi.unfollowUser(dataItem._id);
         toast.success('Unfollowed');
+        refreshCurrentUser?.();
+        setShowPopup?.(false);
         newFollowingStatus = false;
       } else {
         await userApi.followUser(dataItem._id);
         toast.success('Followed');
+        refreshCurrentUser?.();
+        setShowPopup?.(false);
         newFollowingStatus = true;
       }
       setIsFollowing(newFollowingStatus);
@@ -55,19 +58,33 @@ const CartUser = ({
     setLoading(false);
   };
 
+  const handleClickName = () => {
+    const isMe = infoUser?._id === dataItem?._id;
+    if (isMe) {
+      navigate(`/profile`);
+      setShowPopup?.(false);
+    } else {
+      navigate(`/profile/${dataItem?._id}`);
+      setShowPopup?.(false);
+    }
+  }
 
   useEffect(() => {
-    setIsFollowing(dataItem?.isFollowing || false);
-  }, [dataItem?.isFollowing]);
+    setIsFollowing(infoUser?.following.includes(dataItem?._id) || false);
+  }, [infoUser?.following, dataItem?._id]);
 
   return (
     <StyleCartUser $size={size}>
       <div className="cartuser_container">
         <div className="cartuser_avatar">
           <Avatar
-            size={avatarSize}
-            icon={!dataItem?.avatar && <UserOutlined />}
-            src={dataItem?.avatar}
+            size={32}
+            src={!avatarError && dataItem.avatar ? dataItem.avatar : undefined}
+            icon={<UserOutlined />}
+            onError={() => {
+              setAvatarError(true);
+              return false;
+            }}
           />
           {onChangeAvatar && (
             <Button
@@ -81,13 +98,13 @@ const CartUser = ({
           )}
         </div>
         <div className="cartuser_info">
-          <span className="cartuser_name" onClick={() => navigate(`/profile/${dataItem?._id}`)}>
+          <span className="cartuser_name" onClick={handleClickName}>
             {dataItem?.name || dataItem?.nameDisplay || dataItem?.userName}
           </span>
           <div className="cartuser_desc">{dataItem?.bio || 'Mô tả ngắn'}</div>
         </div>
       </div>
-      {dataItem?._id && dataItem._id !== currentUserId && (
+      {dataItem?._id && dataItem._id !== infoUser?._id && (
         <div className="cartuser_follow" onClick={handleFollowToggle}>
           <Button
             size="small"
