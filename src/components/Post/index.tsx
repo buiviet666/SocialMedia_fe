@@ -66,7 +66,7 @@ const Post = ({ data, infoUser, refreshPosts}: Props) => {
   const [isLikeModalOpen, setIsLikeModalOpen] = useState(false);
   const [likeUsers, setLikeUsers] = useState([]);
   const [listComment, setListComment] = useState<any[]>([]);
-  const [isFollowing, setIsFollowing] = useState<boolean>(infoUser.following.includes(data.userId._id) || false);
+  const [isFollowing, setIsFollowing] = useState<boolean>(infoUser?.following.includes(data.userId._id) || false);
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [loadingDelete, setLoadingDelete] = useState(false);

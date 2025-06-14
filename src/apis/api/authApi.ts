@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axiosClient from "../axiosClient";
 
 type GenericObject = Partial<Record<string, unknown>>;

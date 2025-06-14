@@ -30,6 +30,7 @@ const CartUser = ({
   const [loading, setLoading] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
   const navigate = useNavigate();
+  const isMe = infoUser?._id === dataItem?._id;
 
   const handleFollowToggle = async () => {
     if (!dataItem?._id) return;
@@ -59,7 +60,6 @@ const CartUser = ({
   };
 
   const handleClickName = () => {
-    const isMe = infoUser?._id === dataItem?._id;
     if (isMe) {
       navigate(`/profile`);
       setShowPopup?.(false);
@@ -93,7 +93,7 @@ const CartUser = ({
               onClick={onChangeAvatar}
               className="change_avatar_btn"
             >
-              Đổi ảnh
+              Change photo
             </Button>
           )}
         </div>
@@ -101,7 +101,7 @@ const CartUser = ({
           <span className="cartuser_name" onClick={handleClickName}>
             {dataItem?.name || dataItem?.nameDisplay || dataItem?.userName}
           </span>
-          <div className="cartuser_desc">{dataItem?.bio || 'Mô tả ngắn'}</div>
+          <div className="cartuser_desc">{dataItem?.bio || 'Short description'}</div>
         </div>
       </div>
       {dataItem?._id && dataItem._id !== infoUser?._id && (

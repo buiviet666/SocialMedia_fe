@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import styled from "styled-components";
-import { Input, Avatar, List, Button, Tooltip, InputRef, Dropdown, MenuProps } from "antd";
-import { SendOutlined } from "@ant-design/icons";
+import { Input, Avatar, List, Button, Tooltip, InputRef, Dropdown } from "antd";
+import { SendOutlined, UserOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import userApi from "../../apis/api/userApi";
 import conversationApi from "../../apis/api/conversation";
@@ -10,6 +10,8 @@ import messageApi from "../../apis/api/messageApi";
 import toast from "react-hot-toast";
 import socket from "../../utils/socket";
 import { MdOutlineMoreVert } from "react-icons/md";
+import moment from "moment";
+import ModalDelete from "../Modal/ModalDelete";
 
 type MessageProps = {
   onClose?: () => void;
@@ -23,6 +25,14 @@ const Message = ({ onClose }: MessageProps) => {
   const [input, setInput] = useState("");
   const selectedRef = useRef<any>(null);
   const chatRef = useRef<HTMLDivElement>(null);
+  const [avatarError, setAvatarError] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [loadingDelete, setLoadingDelete] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [dataToDel, setDataToDel] = useState<any>(null);
+  const [editingValue, setEditingValue] = useState<string>("");
+  const [infoUser, setInfoUser] = useState<any>(null);
+
   const navigate = useNavigate();
   const currentUserId = sessionStorage.getItem("userId") || localStorage.getItem("userId");
 
@@ -30,6 +40,7 @@ const Message = ({ onClose }: MessageProps) => {
     const fetchData = async () => {
       try {
         const resUser = await userApi.getCurrentUser();
+        setInfoUser(resUser?.data)
         const user = resUser?.data;
 
         if (!user?.following || user.following.length === 0) {
@@ -174,7 +185,7 @@ const Message = ({ onClose }: MessageProps) => {
 
   const handleDeleteConversation = async (data: any) => {
     try {
-      const res: any = await conversationApi.deleteConversation(data._id);
+      const res: any = await conversationApi.deleteConversation(data);
 
       if (res?.statusCode === 200) {
         toast.success(res?.message || "Delete success!");
@@ -189,7 +200,7 @@ const Message = ({ onClose }: MessageProps) => {
 
   const handleClick = (key: string, conversation: any) => {
     switch (key) {
-      case "delete":
+      case "delete_convo":
         handleDeleteConversation(conversation);
         break;
       default:
@@ -224,64 +235,157 @@ const Message = ({ onClose }: MessageProps) => {
     };
   }, []);
 
+  const handleMsgMenuClick = (key: string, msg: any) => {
+    switch (key) {
+      case "edit":
+        setEditingMessageId(msg._id);
+        setEditingValue(msg.content);
+        break;
+      case "delete":
+        handleClickPopupDel(msg);
+        break;
+      case "report":
+        console.log("Report:", msg);
+        break;
+    }
+  };
+
+  const handleClickPopupDel = (data: any) => {
+    setDataToDel(data?._id);
+    setIsDeleteConfirmOpen(true);
+  }
+
+  const handleUpdateMessage = async (messageId: string) => {
+    const msg = selected?.messages?.find((m: any) => m._id === messageId);
+    if (!msg) {
+      toast.error("Không tìm thấy tin nhắn cần sửa");
+      return;
+    }
+
+    const senderId = msg?.senderId?._id || msg?.senderId;
+    if (senderId !== infoUser?._id) {
+      toast.error("Bạn không thể sửa tin nhắn của người khác");
+      return;
+    }
+
+    if (!editingValue.trim()) {
+      toast.error("Nội dung không được để trống");
+      return;
+    }
+
+    try {
+      const res = await messageApi.updateMessage(messageId, editingValue);
+      const updatedMsg = res.data;
+
+      setSelected((prev: any) => ({
+        ...prev,
+        messages: prev.messages.map((m: any) =>
+          m._id === messageId ? updatedMsg : m
+        ),
+      }));
+
+      toast.success("Cập nhật tin nhắn thành công");
+      setEditingMessageId(null);
+      setEditingValue("");
+    } catch (err) {
+      console.error("Lỗi cập nhật:", err);
+      toast.error("Không thể cập nhật tin nhắn");
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      setLoadingDelete(true); // bạn cần có state này
+      const res: any = await messageApi.deleteMessage(messageId);
+
+      if (res?.statusCode === 200) {
+        toast.success(res?.message || "Đã xóa tin nhắn");
+
+        setSelected((prev: any) => ({
+          ...prev,
+          messages: prev.messages.map((msg: any) =>
+            msg._id === messageId ? { ...msg, status: "DELETED", content: "" } : msg
+          ),
+        }));
+        setIsDeleteConfirmOpen(false);
+      }
+    } catch (error) {
+      toast.error("Không thể xóa tin nhắn");
+      console.error("Error:", error);
+    } finally {
+      setLoadingDelete(false);
+    }
+  };
+
+
+
   return (
     <StyleMessage>
-      <div
-        className="flex justify-end mb-3.5 cursor-pointer hover:underline text-[16px]"
-        onClick={handleClickFriend}
-      >
-        xem tất cả
-      </div>
-
       {!selected ? (
         <>
-          <div className="friendList">
-            {friends.map((friend: any) => {
-              const existingConversation = conversations.find((conv: any) =>
-                conv.participants.some((p: any) => p._id === friend._id)
-              );
+          <div className="flex flex-row items-center">
+            <div className="friendList">
+              {friends.map((friend: any) => {
+                const existingConversation = conversations.find((conv: any) =>
+                  conv.participants.some((p: any) => p._id === friend._id)
+                );
 
-              const handleClick = () => {
-                if (existingConversation) {
-                  openChatWithFriend(existingConversation);
-                } else {
-                  setSelected({
-                    _id: null,
-                    name: friend.nameDisplay || friend.userName,
-                    avatar: friend.avatar,
-                    id: friend._id,
-                    messages: [],
-                  });
-                }
-              };
+                const handleClick = () => {
+                  if (existingConversation) {
+                    openChatWithFriend(existingConversation);
+                  } else {
+                    setSelected({
+                      _id: null,
+                      name: friend.nameDisplay || friend.userName,
+                      avatar: friend.avatar,
+                      id: friend._id,
+                      messages: [],
+                    });
+                  }
+                };
 
-              return (
-                // <div key={friend._id} className="friendItem" onClick={handleClick}>
-                //   <Avatar src={friend.avatar} size={50} />
-                //   <span>{friend.nameDisplay || friend.userName}</span>
-                // </div>
-                <Tooltip
-                  placement="top"
-                  title={friend.nameDisplay || friend.userName}
-                  arrow
-                  key={friend._id}
-                >
-                  <div
-                    className="friend-item"
-                    onClick={handleClick}
+                return (
+                  // <div key={friend._id} className="friendItem" onClick={handleClick}>
+                  //   <Avatar src={friend.avatar} size={50} />
+                  //   <span>{friend.nameDisplay || friend.userName}</span>
+                  // </div>
+                  <Tooltip
+                    placement="top"
+                    title={friend.nameDisplay || friend.userName}
+                    arrow
+                    key={friend._id}
                   >
-                    <div className="avatar-wrapper">
-                      <Avatar src={friend.avatar} size={50} />
-                      <span className={`status-indicator ${friend.isOnline ? "online" : "offline"}`} />
+                    <div
+                      className="friend-item"
+                      onClick={handleClick}
+                    >
+                      <div className="avatar-wrapper">
+                        <Avatar
+                          size="large"
+                          src={!avatarError && friend?.avatar ? friend.avatar : undefined}
+                          icon={<UserOutlined />}
+                          onError={() => {
+                            setAvatarError(true);
+                            return false;
+                          }}
+                        />
+                        <span className={`status-indicator ${friend.isOnline ? "online" : "offline"}`} />
+                      </div>
+                      <div>{friend.nameDisplay || friend.userName}</div>
                     </div>
-                    <div>{friend.nameDisplay || friend.userName}</div>
-                  </div>
-                </Tooltip>
-              );
-            })}
+                  </Tooltip>
+                );
+              })}
+            </div>
+            <div
+              className="pl-3 flex justify-end mb-3.5 cursor-pointer hover:underline text-[16px] text-nowrap"
+              onClick={handleClickFriend}
+            >
+              see all
+            </div>
           </div>
           <List
-            header={<strong>Đoạn chat gần đây</strong>}
+            header={<strong>Recent chats</strong>}
             itemLayout="horizontal"
             dataSource={conversations.filter((c: any) => c.lastMessage)}
             renderItem={(conversation: any) => {
@@ -308,7 +412,7 @@ const Message = ({ onClose }: MessageProps) => {
                   <Dropdown
                     menu={{ 
                       items: [
-                        {label: "Delete", key: "delete"}
+                        {label: "Delete", key: "delete_convo"}
                       ], 
                       onClick: ({key}) => handleClick(key, conversation) }}
                     trigger={["click"]}
@@ -322,7 +426,7 @@ const Message = ({ onClose }: MessageProps) => {
           />
         </>
       ) : (
-        <div className="flex flex-col" style={{ height: "95%" }}>
+        <div className="flex flex-col h-full">
           <div className="chatHeader">
             <Avatar src={selected.avatar} />
             <Tooltip placement="top" title={selected.name} arrow>
@@ -339,33 +443,132 @@ const Message = ({ onClose }: MessageProps) => {
               </span>
             </Tooltip>
             <Button type="text" onClick={() => setSelected(null)} className="ml-auto">
-              Quay lại
+              Back
             </Button>
           </div>
           <div className="chatContent" ref={chatRef}>
-            {(selected.messages || []).map((msg: any, idx: number) => (
-              <div
-                key={idx}
-                className={`chatBubble ${
-                  msg?.senderId?._id === currentUserId ? "me" : "other"
-                }`}
-              >
-                {msg.content}
-              </div>
-            ))}
+            {(selected.messages || []).map((msg: any, idx: number) => {
+              const isMe = msg.senderId?._id === currentUserId;
+
+              const dropdownItems = [];
+              if (isMe && (msg.status === 'SENT' || msg.status === 'EDITED')) {
+                dropdownItems.push({ key: 'edit', label: 'Chỉnh sửa' });
+              }
+              if (isMe && msg.status !== 'DELETED') {
+                dropdownItems.push({ key: 'delete', label: 'Xóa' });
+              }
+              if (!isMe && msg.status !== 'DELETED') {
+                dropdownItems.push({ key: 'report', label: 'Báo cáo' });
+              }
+              const formattedTime = moment(msg.createdAt).format("HH:mm, DD/MM/YYYY");
+
+              return (
+                <div
+                  key={idx}
+                  className={`group relative flex items-end gap-2 ${
+                    isMe ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  {!isMe && <Avatar src={msg.senderId?.avatar} size={30} />}
+
+                  <div
+                    className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm relative ${
+                      isMe ? "bg-blue-100 rounded-br-md" : "bg-gray-200 rounded-bl-md"
+                    }`}
+                  >
+                    {/* Hiển thị nội dung theo status */}
+                    <div className={`${['DELETED', 'HIDDEN'].includes(msg.status) ? 'italic text-gray-500' : ''}`}>
+                      {editingMessageId === msg._id ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            size="small"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onPressEnter={() => handleUpdateMessage(msg._id)}
+                            className="text-sm"
+                            autoFocus
+                          />
+                          <div className="flex gap-1">
+                            <Button
+                              size="small"
+                              type="primary"
+                              onClick={() => handleUpdateMessage(msg._id)}
+                            >
+                              ✅
+                            </Button>
+                            <Button
+                              size="small"
+                              danger
+                              onClick={() => {
+                                setEditingMessageId(null);
+                                setEditingValue("");
+                              }}
+                            >
+                              ❌
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {msg.status === 'DELETED' && 'Tin nhắn đã bị xóa'}
+                          {msg.status === 'HIDDEN' && 'Tin nhắn đã bị ẩn bởi quản trị viên'}
+                          {msg.status === 'SENT' && msg.content}
+                          {msg.status === 'EDITED' && (
+                            <>
+                              {msg.content}
+                              <span className="ml-2 text-xs italic text-gray-400">(đã chỉnh sửa)</span>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="text-[10px] text-gray-500 text-right mt-1">
+                      {formattedTime}
+                    </div>
+
+                    {/* Dropdown hiển thị khi hover nếu có menu */}
+                    {dropdownItems.length > 0 && (
+                      <div className="absolute top-1 right-1 hidden group-hover:block">
+                        <Dropdown
+                          menu={{
+                            items: dropdownItems,
+                            onClick: ({ key }) => handleMsgMenuClick(key, msg),
+                          }}
+                          trigger={["click"]}
+                        >
+                          <MdOutlineMoreVert className="text-gray-500 cursor-pointer" />
+                        </Dropdown>
+                      </div>
+                    )}
+                  </div>
+
+                  {isMe && <Avatar src={msg.senderId?.avatar} size={30} />}
+                </div>
+              );
+            })}
           </div>
+
           <div className="chatInput mt-auto">
             <Input
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onPressEnter={handleSend}
-              placeholder="Nhập tin nhắn..."
+              placeholder="Enter message..."
             />
             <Button type="primary" icon={<SendOutlined />} onClick={handleSend} />
           </div>
         </div>
       )}
+      <ModalDelete
+        open={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={() => handleDeleteMessage(dataToDel)}
+        loading={loadingDelete}
+        title="Delete message"
+        description="Are you sure you want to delete this message? This action cannot be undone."
+      />
     </StyleMessage>
   );
 };
@@ -374,7 +577,6 @@ const StyleMessage = styled.div`
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 12px;
 
   .friendList {
     display: flex;

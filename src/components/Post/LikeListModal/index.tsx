@@ -14,11 +14,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   users: UserLike[];
-  infoUser: any;
+  infoUser?: any;
 }
 
 const LikeListModal = ({ open, onClose, users, infoUser }: Props) => {
-  console.log("users", users);
   
   return (
     <Modal

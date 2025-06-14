@@ -44,11 +44,8 @@ const CreatePost = ({
 }: Props) => {
   const [showPopup, setShowPopup] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [friendsList, setFriendsList] = useState<any[]>([]);
-  console.log("dataInfoUser", dataInfoUser);
   const navigate = useNavigate();
-
 
   const content = useWatch({ control, name: "content" });
   const valuePrivacy = useWatch({ control, name: "privacy" });
@@ -98,20 +95,20 @@ const CreatePost = ({
       description: 'People who follow you can see',
       icon: <FaUserFriends />
     },
-    {
-      key: 3,
-      name: 'FRIENDONLY',
-      openPopup: true,
-      description: 'Only people you choose can see your posts',
-      icon: <FaUser />
-    },
-    {
-      key: 4,
-      name: 'EXCEPTFRIEND',
-      openPopup: true,
-      description: 'People you choose will not be able to see your posts.',
-      icon: <LiaUserFriendsSolid />
-    }
+    // {
+    //   key: 3,
+    //   name: 'FRIENDONLY',
+    //   openPopup: true,
+    //   description: 'Only people you choose can see your posts',
+    //   icon: <FaUser />
+    // },
+    // {
+    //   key: 4,
+    //   name: 'EXCEPTFRIEND',
+    //   openPopup: true,
+    //   description: 'People you choose will not be able to see your posts.',
+    //   icon: <LiaUserFriendsSolid />
+    // }
   ]
 
   const handleImageChange = (info: any) => {
@@ -147,11 +144,11 @@ const CreatePost = ({
     }
   };
 
-  const text = `
-    A dog is a type of domesticated animal.
-    Known for its loyalty and faithfulness,
-    it can be found as a welcome guest in many households across the world.
-  `;
+  // const text = `
+  //   A dog is a type of domesticated animal.
+  //   Known for its loyalty and faithfulness,
+  //   it can be found as a welcome guest in many households across the world.
+  // `;
 
   const items: CollapseProps['items'] = [
     {
@@ -229,11 +226,11 @@ const CreatePost = ({
           ))}
         </div>
     },
-    {
-      key: '3',
-      label: 'Advantage Setting',
-      children: <p>{text}</p>,
-    }
+    // {
+    //   key: '3',
+    //   label: 'Advantage Setting',
+    //   children: <p>{text}</p>,
+    // }
   ];
 
   const handleClickProfile = () => {
@@ -257,7 +254,7 @@ const CreatePost = ({
               <div className="icon-custom-images">
                 <img src={logoPhoto} alt="photosIcon" style={{width: '100%'}}/>
               </div>
-              <Button icon={<UploadOutlined />} className="customBtnChoosePhoto">Chọn ảnh</Button>
+              <Button icon={<UploadOutlined />} className="customBtnChoosePhoto">Choose photo</Button>
             </Upload>
           )}
 
@@ -456,7 +453,7 @@ const CreateStyled = styled.div`
 
   .custom-collapse {
     border: unset;
-    max-height: 360px;
+    max-height: 320px;
     overflow: auto;
     scrollbar-width: none;
   }

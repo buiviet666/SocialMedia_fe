@@ -10,7 +10,6 @@ import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import ModalReport from "../../Modal/ModalReport";
 import { FaCheck } from "react-icons/fa";
-import { RiCloseFill } from "react-icons/ri";
 import { GrFormClose } from "react-icons/gr";
 
 const reasonReport = [
@@ -255,7 +254,7 @@ const CommentItem = ({ comment, currentUserId, dataPost, getDataListCmt }: Props
             <input
               value={replyContent}
               onChange={(e) => setReplyContent(e.target.value)}
-              placeholder="Nhập phản hồi..."
+              placeholder="Enter feedback..."
               className="border px-3 py-1 rounded-md text-sm w-full"
             />
             <SendOutlined

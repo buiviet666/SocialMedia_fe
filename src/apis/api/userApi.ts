@@ -25,7 +25,7 @@ const userApi = {
   getUsersByIds: (ids: string[]) => axiosClient.post("/users/bulk", { ids }),
   changeEmail: (data: { password: string; newEmail: string }) => axiosClient.patch("/users/change-email", data),
   changePassword: (data: { currentPassword: string; newPassword: string }) => axiosClient.patch("/users/change-password", data),
-  getFriends: () => axiosClient.get("/users/friends"),
+  getFollowing: () => axiosClient.get("/users/following"),
   getFriendConversation: (friendId: string) => axiosClient.get(`/conversations/${friendId}`),
 };
 

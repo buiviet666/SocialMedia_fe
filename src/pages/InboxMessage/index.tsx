@@ -4,14 +4,22 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import userApi from "../../apis/api/userApi";
 import conversationApi from "../../apis/api/conversation";
-import { Avatar, Dropdown, Input, List, MenuProps, Modal, Tooltip } from "antd";
+import { Avatar, Dropdown, List, MenuProps, Tooltip } from "antd";
 import toast from "react-hot-toast";
 import messageApi from "../../apis/api/messageApi";
 import socket from "../../utils/socket";
-import { MdClose, MdOutlineMoreVert } from "react-icons/md";
-import { FaCheck } from "react-icons/fa";
+import { MdOutlineMoreVert } from "react-icons/md";
 import MessageList from "../../components/MessageList";
 import ModalReport from "../../components/Modal/ModalReport";
+import { UserOutlined } from "@ant-design/icons";
+import ModalDelete from "../../components/Modal/ModalDelete";
+
+interface SelectedConversation {
+  messages?: any[];
+  participants?: any[];
+  _id?: string | null;
+  infoUser?: any;
+}
 
 const reasonReport = [
   "Spam or inappropriate content",
@@ -26,293 +34,170 @@ const InboxMessage = () => {
   const navigate = useNavigate();
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const currentUserId = sessionStorage.getItem("userId") || localStorage.getItem("userId") || '';
-  const [dataCurrent, setDataCurrent] = useState<any>(null);
-  const [dataListFriend, setDataListFriend] = useState<any[]>([]);
-  const [dataConversation, setDataConversation] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<any>(null);
+  const [selected, setSelected] = useState<SelectedConversation | null>(null);
+  const [avatarError, setAvatarError] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [dataDeleteConversation, setDataDeleteConversation] = useState(null);
+  const [loadingDelete, setLoadingDelete] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState<string>("");
   const [input, setInput] = useState("");
+  const [infoUser, setInfoUser] = useState<any>(null);
+  const [listFollowing, setListFollowing] = useState<any>(null);
+  const [listConversation, setListConversation] = useState<any>(null);
   const [reportModal, setReportModal] = useState<{
     open: boolean;
     messageId: string | null;
   }>({ open: false, messageId: null });
-  const [reportReason, setReportReason] = useState("");
 
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const userRes = await userApi.getCurrentUser();
-        setDataCurrent(userRes.data);
-
-        if (userRes?.data?.following?.length > 0) {
-          const friendsRes = await userApi.getUsersByIds(userRes.data.following);
-          setDataListFriend(friendsRes.data);
-        } else {
-          setDataListFriend([]);
-        }
-
-        const convRes = await conversationApi.getListConversation();
-        setDataConversation(convRes.data);
-
-      } catch (err) {
-        console.log(err);
-        toast.error("Lỗi khi tải dữ liệu");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    if (!socket.connected) {
-      socket.connect();
-    }
-
-    if (currentUserId) {
-      socket.emit("join", currentUserId);
-    }
-
-    socket.on("receive_message", handleReceiveMessage);
-
-    return () => {
-      socket.off("receive_message", handleReceiveMessage);
-    };
-  }, [currentUserId]);
-
-  useEffect(() => {
-    socket.on("message_deleted", ({ messageId }) => {
-      setSelected((prev: any) => ({
-        ...prev,
-        messages: prev.messages.filter((m: any) => m._id !== messageId),
-      }));
-    });
-
-    return () => {
-      socket.off("message_deleted");
-    };
-  }, [selected?._id]);
-
-  useEffect(() => {
-    const handleMessageEdited = ({ messageId, content, status, updatedAt }: any) => {
-      setSelected((prev: any) => ({
-        ...prev,
-        messages: prev.messages.map((msg: any) =>
-          msg._id === messageId
-            ? { ...msg, content, status, updatedAt }
-            : msg
-        ),
-      }));
-    };
-
-    socket.on("message_edited", handleMessageEdited);
-
-    return () => {
-      socket.off("message_edited", handleMessageEdited);
-    };
-  }, [selected?._id]);
-  
-  
-
-  const handleDeleteConversation = async (data: any) => {
+  const getInfoUser = async () => {
     try {
-      const res: any = await conversationApi.deleteConversation(data._id);
-
-      if (res?.statusCode === 200) {
-        toast.success(res?.message || "Delete success!");
-      } else {
-        toast.error(res?.message || "Error!")
-      }
+      const res: any = await userApi.getCurrentUser();
+      setInfoUser(res?.data);
     } catch (error) {
+      toast.error("Error loading data");
       console.log(error);
-      toast.error("Error server!")
+    }
+  };
+
+  const getListFollowing = async () => {
+    try {
+      const res: any = await userApi.getFollowing();
+      setListFollowing(res?.data);
+    } catch (error) {
+      toast.error("Error loading data");
+      console.log(error);
     }
   }
 
-  const handleDeleteMessage = async (messageId: string) => {
+  const getListConverSation = async () => {
     try {
-      const res: any = await messageApi.deleteMessage(messageId);
-
-      if (res?.statusCode === 200) {
-        toast.success(res.message || "Xóa tin nhắn thành công");
-
-        // Cập nhật lại danh sách tin nhắn trong hội thoại hiện tại
-        setSelected((prev: any) => ({
-          ...prev,
-          messages: prev.messages.filter((msg: any) => msg._id !== messageId),
-        }));
-
-        // (Nếu dùng socket.io để đồng bộ realtime)
-        socket.emit("delete_message", {
-          messageId,
-          conversationId: selected._id,
-        });
-      } else {
-        toast.error(res?.message || "Không thể xóa tin nhắn");
-      }
-    } catch (error: any) {
-      console.error("❌ Lỗi xóa tin nhắn:", error);
-      toast.error("Lỗi máy chủ. Vui lòng thử lại sau.");
+      const res: any = await conversationApi.getListConversation();
+      setListConversation(res?.data);
+    } catch (error) {
+      toast.error("Error loading data");
+      console.log(error);
     }
-  };
+  }
 
-
-  const handleReceiveMessage = async (message: any) => {
-    const conversationId = message.conversationId._id || message.conversationId;
-
-    // Nếu đang mở đúng hội thoại
-    if (selected?._id === conversationId) {
-      setSelected((prev: any) => ({
-        ...prev,
-        messages: [...(prev?.messages || []), message],
-      }));
-
-      try {
-        // Nếu chưa đánh dấu đã nhận
-        if (!message.deliveredTo?.includes(currentUserId)) {
-          await messageApi.markAsDelivered(message._id);
-        }
-      } catch (err) {
-        console.error("Lỗi markAsDelivered:", err);
-      }
+  const getDataConversationById = async (idConversation: string): Promise<any[]> => {
+    try {
+      const res: any = await messageApi.getMessagesByConversation(idConversation);
+      return res?.data || [];
+    } catch (error) {
+      toast.error("Error loading data");
+      console.log(error);
+      return [];
     }
+  }
 
-    // Cập nhật lastMessage trong danh sách hội thoại
-    setDataConversation((prev: any[]) =>
-      prev.map((conv: any) =>
-        conv._id === conversationId
-          ? { ...conv, lastMessage: message }
-          : conv
-      )
+  const getFriendInfo = () => {
+    const found = selected?.participants?.find((p: any) => p._id !== infoUser?._id);
+    if (found) return found;
+
+    const fallback = listFollowing.find((f: any) =>
+      selected?.participants?.some?.((p: any) => p._id === f._id) || selected?._id === f._id
     );
+    return fallback;
   };
 
-  const markMessagesAsDeliveredAndRead = async (messages: any[]) => {
-    const deliveredIds: string[] = [];
-    const readIds: string[] = [];
-
-    messages.forEach((msg) => {
-      const senderId = msg.senderId?._id || msg.senderId;
-      if (senderId !== currentUserId) {
-        if (!msg.deliveredTo?.includes(currentUserId)) deliveredIds.push(msg._id);
-        if (!msg.seenBy?.includes(currentUserId)) readIds.push(msg._id);
-      }
-    });
-
+  const handleChooseChat = async (conversationOrFriend: any, type: "friend" | "message") => {
     try {
-      if (deliveredIds.length > 0) {
-        await messageApi.markDeliveredBulk({ messageIds: deliveredIds });
-        socket.emit("messages_delivered", {
-          messageIds: deliveredIds,
-          deliveredBy: currentUserId,
-        });
+      let messages = [];
+      const isHasConversation = conversationOrFriend?.participants?.length;
+      const otherUser = conversationOrFriend?.participants?.length
+        ? conversationOrFriend.participants.find((p: any) => p._id !== infoUser._id)
+        : conversationOrFriend;
+      if (type === "friend") {
+        if (isHasConversation) {
+          messages = await getDataConversationById(conversationOrFriend?._id);
+          setSelected({ ...conversationOrFriend, messages: messages, infoUser: otherUser});
+          navigate(`/inbox/${conversationOrFriend._id}`);
+        } else {
+          setSelected({
+            _id: null,
+            participants: [infoUser, conversationOrFriend],
+            messages: [],
+            infoUser: conversationOrFriend
+          });
+          navigate(`/inbox/${conversationOrFriend._id}`);
+        }
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 0);
+        return;
+      } else if (type === "message") {
+        messages = await getDataConversationById(conversationOrFriend?._id);
+        setSelected({ ...conversationOrFriend, messages: messages, infoUser: otherUser});
+        navigate(`/inbox/${conversationOrFriend?._id}`);
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 0);
       }
-
-      if (readIds.length > 0) {
-        await messageApi.markReadBulk({ messageIds: readIds });
-        socket.emit("messages_read", {
-          messageIds: readIds,
-          readBy: currentUserId,
-        });
-      }
-    } catch (err) {
-      console.error("❌ Lỗi khi đánh dấu đã nhận/đọc:", err);
+    } catch (error) {
+      toast.error("Unable to open conversation.");
+      console.error(error);
     }
   };
+
+  const handleDeltePopup = (data: any) => {
+    setDataDeleteConversation(data);
+    setIsDeleteConfirmOpen(true);
+  }
 
   const handleSendMessage = async () => {
+    const messageText = input.trim();
     if (!input.trim() || !selected) return;
+
+    setInput("");
 
     try {
       let conversationId = selected._id;
-
-      // Nếu chưa có hội thoại, tạo mới
       if (!conversationId) {
-        const partner = selected.participants?.find((p: any) => p._id !== currentUserId);
+        const partner = selected.participants?.find((p: any) => p._id !== infoUser?._id);
         const res = await conversationApi.createConversation({ partnerId: partner._id });
         conversationId = res.data._id;
 
-        // Cập nhật danh sách và URL
-        setDataConversation((prev) => [...prev, res.data]);
+        setListConversation((prev: any) => [...prev, res.data]);
         navigate(`/inbox/${conversationId}`);
 
-        setSelected((prev: any) => ({
+        setSelected({
           ...res.data,
           messages: [],
-        }));
+        });
       }
 
       const res = await messageApi.sendMessage({
         conversationId,
-        content: input,
+        content: messageText,
         type: "TEXT",
       });
+
       const newMsg = res.data;
+
       setSelected((prev: any) => ({
         ...prev,
         _id: conversationId,
         messages: [...(prev?.messages || []), newMsg],
       }));
+
       socket.emit("send_message", newMsg);
-      setInput("");
     } catch (err) {
       console.log(err);
-      toast.error("Không gửi được tin nhắn.");
-    }
-  };
-
-  const handleChooseChat = async (conversationOrFriend: any, type: "friend" | "message") => {
-    try {
-      const selectedConversation = conversationOrFriend;
-
-      if (type === "friend") {
-        // Nếu đã có conversation
-        const existing = dataConversation.find((conv: any) =>
-          conv.participants.some((p: any) => p._id === conversationOrFriend._id)
-        );
-
-        if (existing) {
-          const messagesRes = await messageApi.getMessagesByConversation(existing._id);
-          setSelected({ ...existing, messages: messagesRes.data });
-          await markMessagesAsDeliveredAndRead(messagesRes.data);
-          navigate(`/inbox/${existing._id}`);
-        } else {
-          // Hiển thị giao diện trò chuyện với bạn (chưa từng nhắn tin)
-          setSelected({
-            _id: null,
-            participants: [dataCurrent, conversationOrFriend],
-            messages: [],
-          });
-          navigate(`/inbox/temp-${conversationOrFriend._id}`); // chỉ để phân biệt
-        }
-
-        setTimeout(() => {
-          inputRef.current?.focus();
-        }, 0);
-
-        return;
-      }
-
-      // Nếu là click từ danh sách hội thoại
-      const messagesRes = await messageApi.getMessagesByConversation(selectedConversation._id);
-      setSelected({ ...selectedConversation, messages: messagesRes.data });
-      navigate(`/inbox/${selectedConversation._id}`);
-
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 0);
-    } catch (error) {
-      console.error("❌ Lỗi khi chọn hội thoại:", error);
-      toast.error("Không thể mở hội thoại.");
+      toast.error("Message could not be sent.");
     }
   };
 
   const handleUpdateMessage = async (messageId: string) => {
+    const msg = selected?.messages?.find((m) => m._id === messageId);
+    const senderId = msg?.senderId?._id || msg?.senderId;
+
+    if (senderId !== infoUser?._id) {
+      toast.error("Bạn không thể sửa tin nhắn của người khác");
+      return;
+    }
+
     try {
       const res = await messageApi.updateMessage(messageId, editingValue);
       const updatedMsg = res.data;
@@ -333,6 +218,156 @@ const InboxMessage = () => {
     }
   };
 
+
+  const handleDeleteConversation = async (data: any) => {
+    try {
+      setLoadingDelete(true);
+      const res: any = await conversationApi.deleteConversation(data._id);
+      if (res?.statusCode === 200) {
+        toast.success(res?.message);
+        setDataDeleteConversation(null);
+        setIsDeleteConfirmOpen(false);
+        getListConverSation();
+      }
+    } catch (error) {
+      toast.error("Error loading data");
+      console.log(error);
+    } finally {
+      setLoadingDelete(false);
+    }
+  }
+
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      const res: any = await messageApi.deleteMessage(messageId);
+
+      if (res?.statusCode === 200) {
+        toast.success(res.message);
+        // Cập nhật lại danh sách tin nhắn trong hội thoại hiện tại
+        setSelected((prev: any) => ({
+          ...prev,
+          messages: prev.messages?.filter((msg: any) => msg._id !== messageId),
+        }));
+        socket.emit("delete_message", {
+          messageId,
+          conversationId: selected?._id,
+        });
+      } else {
+        toast.error(res?.message || "Cannot delete message");
+      }
+    } catch (error: any) {
+      toast.error("Error loading data");
+      console.log(error);
+    }
+  };
+
+  const handleReceiveMessage = async (message: any) => {
+    const conversationId = message.conversationId._id || message.conversationId;
+    // Nếu đang mở đúng hội thoại
+    if (selected?._id === conversationId) {
+      setSelected((prev: any) => ({
+        ...prev,
+        messages: [...(prev?.messages || []), message],
+      }));
+
+      try {
+        // Nếu chưa đánh dấu đã nhận
+        if (!message.deliveredTo?.includes(infoUser?._id)) {
+          await messageApi.markAsDelivered(message._id);
+        }
+      } catch (err) {
+        console.error("Lỗi markAsDelivered:", err);
+      }
+    }
+
+    // Cập nhật lastMessage trong danh sách hội thoại
+    setListConversation((prev: any[]) =>
+      prev.map((conv: any) =>
+        conv._id === conversationId
+          ? { ...conv, lastMessage: message }
+          : conv
+      )
+    );
+  };
+
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+    if (infoUser?._id) {
+      socket.emit("join", infoUser?._id);
+    }
+    socket.on("receive_message", handleReceiveMessage);
+    return () => {
+      socket.off("receive_message", handleReceiveMessage);
+    };
+  }, [infoUser?._id]);
+
+  useEffect(() => {
+    socket.on("message_deleted", ({ messageId }) => {
+      setSelected((prev: any) => ({
+        ...prev,
+        messages: prev.messages?.filter((m: any) => m._id !== messageId),
+      }));
+    });
+
+    return () => {
+      socket.off("message_deleted");
+    };
+  }, [selected?._id]);
+
+  useEffect(() => {
+    const handleMessageEdited = ({ messageId, content, status, updatedAt }: any) => {
+      setSelected((prev: any) => ({
+        ...prev,
+        messages: prev.messages.map((msg: any) =>
+          msg._id === messageId
+            ? { ...msg, content, status, updatedAt }
+            : msg
+        ),
+      }));
+    };
+    socket.on("message_edited", handleMessageEdited);
+    return () => {
+      socket.off("message_edited", handleMessageEdited);
+    };
+  }, [selected?._id]);
+   
+
+  const markMessagesAsDeliveredAndRead = async (messages: any[]) => {
+    const deliveredIds: string[] = [];
+    const readIds: string[] = [];
+
+    messages.forEach((msg) => {
+      const senderId = msg.senderId?._id || msg.senderId;
+      if (senderId !== infoUser?._id) {
+        if (!msg.deliveredTo?.includes(infoUser?._id)) deliveredIds.push(msg._id);
+        if (!msg.seenBy?.includes(infoUser?._id)) readIds.push(msg._id);
+      }
+    });
+
+    try {
+      if (deliveredIds.length > 0) {
+        await messageApi.markDeliveredBulk({ messageIds: deliveredIds });
+        socket.emit("messages_delivered", {
+          messageIds: deliveredIds,
+          deliveredBy: infoUser?._id,
+        });
+      }
+
+      if (readIds.length > 0) {
+        await messageApi.markReadBulk({ messageIds: readIds });
+        socket.emit("messages_read", {
+          messageIds: readIds,
+          readBy: infoUser?._id,
+        });
+      }
+    } catch (err) {
+      console.error("❌ Lỗi khi đánh dấu đã nhận/đọc:", err);
+    }
+  };
+
+
   useEffect(() => {
     if (chatRef.current) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -341,8 +376,8 @@ const InboxMessage = () => {
 
   useEffect(() => {
     const openById = async () => {
-      if (!id || dataConversation.length === 0) return;
-      const foundConv = dataConversation.find((c) => c._id === id);
+      if (!id || listConversation?.length === 0) return;
+      const foundConv = listConversation.find((c: any) => c._id === id);
       if (foundConv) {
         const messagesRes = await messageApi.getMessagesByConversation(id);
         setSelected({ ...foundConv, messages: messagesRes.data });
@@ -350,24 +385,14 @@ const InboxMessage = () => {
       }
     };
     openById();
-  }, [id, dataConversation]);
+  }, [id, listConversation]);
 
-  const getFriendInfo = () => {
-    // Nếu đã có participants
-    const found = selected?.participants?.find((p: any) => p._id !== currentUserId);
-    if (found) return found;
-
-    // Nếu không có → tìm trong danh sách bạn bè
-    const fallback = dataListFriend.find((f: any) =>
-      selected?.participants?.some?.((p: any) => p._id === f._id) || selected?._id === f._id
-    );
-    return fallback;
-  };
+  
 
   const handleClick = (key: string, conversation: any) => {
     switch (key) {
       case "delete":
-        handleDeleteConversation(conversation);
+        handleDeltePopup(conversation);
         break;
       default:
         break;
@@ -385,7 +410,7 @@ const InboxMessage = () => {
   ]
 
   const createMessageMenu = (msg: any): MenuProps => ({
-    items: msg.senderId?._id === currentUserId || msg.senderId === currentUserId ? items2 : items3,
+    items: msg.senderId?._id === infoUser?._id || msg.senderId === infoUser?._id ? items2 : items3,
     onClick: ({ key }) => {
       switch (key) {
         case "delete":
@@ -412,15 +437,15 @@ const InboxMessage = () => {
   useEffect(() => {
     const handleOnlineStatus = ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
       // Cập nhật trạng thái của bạn bè trong danh sách
-      setDataListFriend((prev) =>
-        prev.map((friend) =>
+      setListFollowing((prev: any) =>
+        prev.map((friend: any) =>
           friend._id === userId ? { ...friend, isOnline } : friend
         )
       );
 
       // Cập nhật participant trong danh sách conversation
-      setDataConversation((prev) =>
-        prev.map((conv) => ({
+      setListConversation((prev: any) =>
+        prev.map((conv: any) => ({
           ...conv,
           participants: conv.participants.map((p: any) =>
             p._id === userId ? { ...p, isOnline } : p
@@ -508,31 +533,65 @@ const InboxMessage = () => {
   };
 
 
+  useEffect(() => {
+    const fetchAll = async () => {
+      await getInfoUser();
+      await getListFollowing();
+      await getListConverSation();
+      setLoading(false);
+    };
+    fetchAll();
+  }, []);
 
-  if (loading) return <div>Đang tải dữ liệu...</div>;
+  useEffect(() => {
+    if (!id || !listConversation?.length || !infoUser?._id) return;
+
+    const existingConversation = listConversation.find((conv: any) =>
+      conv.participants.some((p: any) => p._id === id) &&
+      conv.participants.some((p: any) => p._id === infoUser._id)
+    );
+
+    if (existingConversation) {
+      navigate(`/inbox/${existingConversation._id}`);
+    } else {
+      const friend = listFollowing?.find((f: any) => f._id === id);
+      if (friend) {
+        setSelected({
+          _id: null,
+          participants: [infoUser, friend],
+          messages: [],
+          infoUser: friend,
+        });
+      }
+    }
+  }, [id, listConversation, infoUser?._id]);
+
+  console.log("selected", selected);
+  
+
+  if (loading) return <div>Data is loading...</div>;
   
   return (
     <StyleInboxMessage>
       <div className="sidebar">
         <Tooltip
           placement="top"
-          title={dataCurrent?.nameDisplay || dataCurrent?.userName || ''}
+          title={infoUser?.nameDisplay || infoUser?.userName || ''}
           arrow
         >
           <div onClick={() => navigate('/profile')} className="titleNameCustom text-[21px] cursor-pointer inline-block hover:underline">
-            <b>{dataCurrent?.nameDisplay || dataCurrent?.userName || ''}</b>
+            <b>{infoUser?.nameDisplay || infoUser?.userName || ''}</b>
           </div>
         </Tooltip>
 
         <div className="friend-list">
-          {dataListFriend.length === 0 ? (
-            <p>Không có bạn bè nào.</p>
+          {listFollowing?.length === 0 ? (
+            <p>No friends yet.</p>
           ) : (
-            dataListFriend?.map((friend: any) => {
-              const existingConversation = dataConversation.find((conv: any) =>
-                conv.participants.some((p: any) => p._id === friend._id)
+            listFollowing?.map((friend: any) => {
+              const existingConversation = listConversation.find((item: any) =>
+                item.participants.some((p: any) => p._id === friend._id)
               );
-
               return (
                 <Tooltip
                   placement="top"
@@ -542,10 +601,18 @@ const InboxMessage = () => {
                 >
                   <div
                     className="friend-item"
-                    onClick={() => handleChooseChat(existingConversation || friend, "friend")}
+                    onClick={() => handleChooseChat(existingConversation || friend, "friend",)}
                   >
                     <div className="avatar-wrapper">
-                      <Avatar src={friend.avatar} size={50} />
+                      <Avatar
+                        size="large"
+                        src={!avatarError && friend?.avatar ? friend.avatar : undefined}
+                        icon={<UserOutlined />}
+                        onError={() => {
+                          setAvatarError(true);
+                          return false;
+                        }}
+                      />
                       <span className={`status-indicator ${friend.isOnline ? "online" : "offline"}`} />
                     </div>
                     <div>{friend.nameDisplay || friend.userName}</div>
@@ -557,14 +624,13 @@ const InboxMessage = () => {
         </div>
         <div>
           <List
-            header={<strong>Tin nhắn</strong>}
+            header={<strong>Message list</strong>}
             itemLayout="horizontal"
-            dataSource={dataConversation.filter((c: any) => c.lastMessage)}
+            dataSource={listConversation?.filter((c: any) => c.lastMessage)}
             renderItem={(conversation: any) => {
               const participant = conversation.participants?.find(
-                (p: any) => p._id !== currentUserId
+                (p: any) => p._id !== infoUser?._id
               ) || {};
-              console.log("participant", participant);
               
               return (
                 <List.Item
@@ -577,7 +643,17 @@ const InboxMessage = () => {
                     style={{ flex: 1, cursor: "pointer" }}
                   >
                     <List.Item.Meta
-                      avatar={<Avatar src={participant.avatar} />}
+                      avatar={
+                        <Avatar
+                          size="large"
+                          src={!avatarError && participant?.avatar ? participant.avatar : undefined}
+                          icon={<UserOutlined />}
+                          onError={() => {
+                            setAvatarError(true);
+                            return false;
+                          }}
+                        />
+                      }
                       title={
                         <Tooltip
                           placement="top"
@@ -588,7 +664,7 @@ const InboxMessage = () => {
                         </Tooltip>
                       }
                       description={
-                        conversation.lastMessage?.content || "Tin nhắn gần nhất"
+                        conversation.lastMessage?.content || "Latest Message"
                       }
                     />
                   </div>
@@ -615,13 +691,38 @@ const InboxMessage = () => {
         {selected ? (
           <>
             <div className="chat-header">
-              <div className="chat-header-info">
+              <div className="chat-header-info flex items-center gap-3">
                 {(() => {
                   const friend = getFriendInfo();
                   return (
                     <>
-                      <Avatar src={friend?.avatar} />
-                      <span>{friend?.nameDisplay || friend?.userName || "Người dùng"}</span>
+                      <Avatar
+                        size="large"
+                        src={!avatarError && friend?.avatar ? friend.avatar : undefined}
+                        icon={<UserOutlined />}
+                        onError={() => {
+                          setAvatarError(true);
+                          return false;
+                        }}
+                      />
+
+                      <div className="flex flex-col">
+                        <span 
+                          className="cursor-pointer font-semibold text-base"
+                          onClick={() => navigate(`/profile/${friend?._id}`)}
+                        >
+                          {friend?.nameDisplay || friend?.userName || "User"}
+                        </span>
+
+                        <span className="text-sm text-gray-500 flex items-center gap-1">
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              friend?.isOnline ? "bg-green-500" : "bg-gray-400"
+                            }`}
+                          ></span>
+                          {friend?.isOnline ? "Online" : "Offline"}
+                        </span>
+                      </div>
                     </>
                   );
                 })()}
@@ -631,8 +732,8 @@ const InboxMessage = () => {
             <div className="chat-body" ref={chatRef}>
               <div className="chat-body" ref={chatRef}>
                 <MessageList
-                  currentUserId={currentUserId}
-                  messages={selected.messages}
+                  currentUserId={infoUser?._id}
+                  messages={selected.messages || []}
                   editingMessageId={editingMessageId}
                   editingValue={editingValue}
                   onEditChange={setEditingValue}
@@ -642,21 +743,33 @@ const InboxMessage = () => {
                 />
               </div>
             </div>
-            <div className="chat-input">
+            <div className="chat-input flex items-center gap-2 p-3 border-t border-gray-200 bg-white">
               <input
                 ref={inputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Nhập tin nhắn..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder="Enter message..."
+                className="flex-1 px-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button onClick={handleSendMessage}>Gửi</button>
+              <button
+                onClick={handleSendMessage}
+                className="bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition duration-200 disabled:opacity-50"
+                disabled={!input.trim()}
+              >
+                Send
+              </button>
             </div>
 
           </>
         ) : (
-          <div className="no-selection">Chọn người để bắt đầu trò chuyện</div>
+          <div className="no-selection">Select person to start chatting with</div>
         )}
       </div>
       <ModalReport
@@ -670,11 +783,18 @@ const InboxMessage = () => {
         title="Report Message"
         reportReasons={reasonReport}
       />
+      <ModalDelete
+        open={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={() => handleDeleteConversation(dataDeleteConversation)}
+        loading={loadingDelete}
+        title="Delete conversation"
+        description="Are you sure you want to delete this conversation? This action cannot be undone."
+      />
     </StyleInboxMessage>
   );
 };
 export default InboxMessage;
-
 const StyleInboxMessage = styled.div`
   display: flex;
   height: 100vh;

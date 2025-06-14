@@ -1,6 +1,6 @@
 import { MailOutlined, SettingOutlined } from '@ant-design/icons';
 import { Menu, MenuProps } from 'antd';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import styled from 'styled-components';
 import EditInfo from './EditInfo';
 import EditVerifyInfo from './EditVerifyInfo';
@@ -12,17 +12,17 @@ const EditPage = () => {
 
   const items: MenuItem[] = [
     {
-      label: 'Chỉnh sửa thông tin người dùng',
+      label: 'Edit user information',
       key: 'info',
       icon: <MailOutlined />,
     },
     {
-      label: 'Đổi thông tin tài khoản',
+      label: 'Change account information',
       key: 'password',
       icon: <MailOutlined />,
     },
     {
-      label: 'Cài đặt nâng cao tài khoản',
+      label: 'Advanced account settings',
       key: 'advanced',
       icon: <SettingOutlined />,
     },

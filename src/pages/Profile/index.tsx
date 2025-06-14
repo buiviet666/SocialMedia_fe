@@ -262,6 +262,13 @@ const Profile = () => {
                     {isFollowing ? "Unfollow" : "Follow"}
                   </Button>
 
+                  <Button
+                    type="primary"
+                    onClick={() => navigate(`/inbox/${id}`)}
+                  >
+                    Message
+                  </Button>
+
                   <Dropdown
                     trigger={["click"]}
                     menu={{

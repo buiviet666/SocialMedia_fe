@@ -1,48 +1,56 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Modal, Button, Input, Form, Alert } from 'antd';
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import styled from 'styled-components';
-import userApi from '../../../apis/api/userApi';
 import { Controller, useForm } from 'react-hook-form';
+import userApi from '../../../apis/api/userApi';
 import authApi from '../../../apis/api/authApi';
 import { ValidateMessage } from '../../../utils/validateMessage';
 
 const EditVerifyInfo = () => {
   const [showPopup, setShowPopup] = useState(false);
-  const [dataChoose, setDataChoose] = useState('');
+  const [dataChoose, setDataChoose] = useState<'password' | 'email' | ''>('');
   const [emailStatus, setEmailStatus] = useState<'verified' | 'noactive' | 'newemail'>('noactive');
   const [cooldown, setCooldown] = useState(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [currentEmail, setCurrentEmail] = useState('');
+  const [statusAcc, setStatusAcc] = useState<'ACTIVE' | 'NOACTIVE'>('NOACTIVE');
 
-  const handleClickEdit = (data: 'password' | 'email') => {
-    setDataChoose(data);
-    setShowPopup(true);
-  };
-
-  const handleSaveEmail = () => {
-    if (email.trim()) {
-      setEmailStatus('newemail');
+  const handleClickEdit = async (type: 'password' | 'email') => {
+    setDataChoose(type);
+    if (type === 'email') {
+      try {
+        const res = await userApi.getCurrentUser();
+        setCurrentEmail(res.data?.emailAddress || '');
+        setStatusAcc(res.data?.statusAcc || 'NOACTIVE');
+        setEmailStatus(res.data?.statusAcc === 'ACTIVE' ? 'verified' : 'noactive');
+      } catch (err) {
+        toast.error('Unable to load email information');
+        console.log(err);
+      }
     }
+    setShowPopup(true);
   };
 
   const handleClose = () => {
     setShowPopup(false);
     setEmail('');
     setPassword('');
-    setEmailStatus('noactive');
+    setEmailStatus(statusAcc === 'ACTIVE' ? 'verified' : 'noactive');
   };
 
   return (
     <StyleEditVerifyInfo>
-      <h2>Xác thực thông tin</h2>
+      <h2>Authentication Management</h2>
 
       <Button type="primary" onClick={() => handleClickEdit('password')}>
-        Đổi mật khẩu
+        Change password
       </Button>
 
       <Button type="default" onClick={() => handleClickEdit('email')}>
-        Quản lý Email
+        Email Management
       </Button>
 
       <Modal
@@ -50,7 +58,7 @@ const EditVerifyInfo = () => {
         onCancel={handleClose}
         footer={null}
         centered
-        title="Đổi mật khẩu"
+        title="Change password"
       >
         <ChangePassword onClose={handleClose} />
       </Modal>
@@ -60,7 +68,7 @@ const EditVerifyInfo = () => {
         onCancel={handleClose}
         footer={null}
         centered
-        title="Xác thực/Thay đổi Email"
+        title="Verify / Change Email"
       >
         <ChangeEmail
           status={emailStatus}
@@ -71,6 +79,7 @@ const EditVerifyInfo = () => {
           password={password}
           setPassword={setPassword}
           setEmailStatus={setEmailStatus}
+          currentEmail={currentEmail}
         />
       </Modal>
     </StyleEditVerifyInfo>
@@ -78,118 +87,69 @@ const EditVerifyInfo = () => {
 };
 
 const ChangePassword = ({ onClose }: { onClose: () => void }) => {
-  const { control, handleSubmit, reset } = useForm<any>({
-      mode: "onBlur",
-      reValidateMode: "onChange",
-      delayError: 200,
-      defaultValues: {
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "false"
-      },
-    });
+  const { control, handleSubmit, reset, getValues } = useForm<any>({
+    mode: 'onBlur',
+    defaultValues: {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    }
+  });
 
   const onSubmit = async (data: any) => {
-    const { currentPassword, newPassword, confirmPassword } = data;
-
-    console.log("data", data); // kiểm tra lại tại đây
-
-    if (newPassword !== confirmPassword) {
-      toast.error("Mật khẩu mới không khớp");
-      return;
-    }
-
+    const { currentPassword, newPassword } = data;
     try {
-      await userApi.changePassword({
-        currentPassword,
-        newPassword,
-      });
-
-      toast.success("Đổi mật khẩu thành công");
+      await userApi.changePassword({ currentPassword, newPassword });
+      toast.success('Password changed successfully');
       reset();
       onClose();
     } catch (error) {
-      toast.error("Đổi mật khẩu thất bại");
+      toast.error('Password change failed');
+      console.log(error);
     }
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <Controller
-        control={control}
-        name="currentPassword"
-        rules={{
-          required: "password is required",
-        }}
-        render={({ field, fieldState }) => (
-          <FormItem>
-            <label className="required" htmlFor="currentPassword">
-              Current password
-            </label>
-            <Input.Password
-              {...field}
-              id="currentPassword"
-              className="custom_input_username"
-              maxLength={255}
-              status={fieldState.invalid ? "error" : ""}
-              placeholder="Enter Current Password"
-            />
-              <ValidateMessage message={fieldState.error?.message}/>
-          </FormItem>
-        )}
-      />
+      {['currentPassword', 'newPassword', 'confirmPassword'].map((fieldName) => (
+        <Controller
+          key={fieldName}
+          control={control}
+          name={fieldName}
+          rules={{
+            required: `${fieldName} is required`,
+            ...(fieldName === 'confirmPassword' && {
+              validate: (val) =>
+                val === getValues('newPassword') || 'Passwords do not match'
+            })
+          }}
+          render={({ field, fieldState }) => (
+            <FormItem>
+              <label className="required" htmlFor={fieldName}>
+                {fieldName === 'currentPassword'
+                  ? 'Current Password'
+                  : fieldName === 'newPassword'
+                  ? 'New Password'
+                  : 'Confirm Password'}
+              </label>
+              <Input.Password
+                {...field}
+                id={fieldName}
+                maxLength={255}
+                status={fieldState.invalid ? 'error' : ''}
+                placeholder={`Input ${fieldName}`}
+              />
+              <ValidateMessage message={fieldState.error?.message} />
+            </FormItem>
+          )}
+        />
+      ))}
 
-      <Controller
-        control={control}
-        name="newPassword"
-        rules={{
-          required: "newPassword is required",
-        }}
-        render={({ field, fieldState }) => (
-          <FormItem>
-            <label className="required" htmlFor="newPassword">
-              Current password
-            </label>
-            <Input.Password
-              {...field}
-              id="newPassword"
-              className="custom_input_username"
-              maxLength={255}
-              status={fieldState.invalid ? "error" : ""}
-              placeholder="Enter New Password"
-            />
-              <ValidateMessage message={fieldState.error?.message}/>
-          </FormItem>
-        )}
-      />
-
-      <Controller
-        control={control}
-        name="confirmPassword"
-        rules={{
-          required: "ConfirmPassword is required",
-        }}
-        render={({ field, fieldState }) => (
-          <FormItem>
-            <label className="required" htmlFor="confirmPassword">
-              Current password
-            </label>
-            <Input.Password
-              {...field}
-              id="confirmPassword"
-              className="custom_input_username"
-              maxLength={255}
-              status={fieldState.invalid ? "error" : ""}
-              placeholder="Enter Confirm Password"
-            />
-              <ValidateMessage message={fieldState.error?.message}/>
-          </FormItem>
-        )}
-      />
-
-      <Button htmlType="submit" type="primary">
-        Lưu
-      </Button>
+      <div className='flex justify-self-end'>
+        <Button htmlType="submit" type="primary">
+          Submit
+        </Button>
+      </div>
     </form>
   );
 };
@@ -203,6 +163,7 @@ const ChangeEmail = ({
   password,
   setPassword,
   setEmailStatus,
+  currentEmail
 }: {
   status: 'verified' | 'noactive' | 'newemail';
   cooldown: number;
@@ -212,83 +173,120 @@ const ChangeEmail = ({
   password: string;
   setPassword: (val: string) => void;
   setEmailStatus: (val: 'verified' | 'noactive' | 'newemail') => void;
+  currentEmail: string;
 }) => {
   const [message, setMessage] = useState('');
 
-  const handleSendVerification = async () => {
-    try {
-      if (status === "newemail") {
-        if (!password) {
-          setMessage("Vui lòng nhập mật khẩu để xác thực");
-          return;
-        }
-        await userApi.changeEmail({ password, newEmail: email });
-      } else {
-        await authApi.sendVerifycationEmailApi(); // bạn bảo giữ nguyên tên này
-      }
-
-      setMessage("Đã gửi mã xác nhận tới email của bạn.");
-      setCooldown(30);
-      const interval = setInterval(() => {
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (cooldown > 0) {
+      timer = setInterval(() => {
         setCooldown((prev) => {
-          if (prev <= 1) clearInterval(interval);
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
           return prev - 1;
         });
       }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  const handleSendVerification = async () => {
+    try {
+      if (status === 'newemail') {
+        await userApi.changeEmail({ password, newEmail: email });
+        toast.success("Change email success!");
+        setEmail('');
+        setPassword('');
+        setEmailStatus('noactive');
+      } else {
+        await authApi.sendVerifycationEmailApi();
+      }
+      setMessage('Verification email sent. Please check your inbox.');
+      setCooldown(30);
     } catch (err) {
-      setMessage("Gửi thất bại. Vui lòng thử lại.");
+      setMessage('Send failed. Please try again.');
+      console.log(err);
     }
   };
 
   return (
-    <div>
+    <Form layout="vertical">
       {(status === 'noactive' || status === 'verified') && (
-        <Form layout="vertical">
-          <Form.Item label="Email hiện tại">
-            <Input value="user@email.com" disabled />
+        <>
+          <Form.Item label="Current email" className='!mb-3'>
+            <Input value={currentEmail} disabled />
           </Form.Item>
-          <Button type="default" onClick={() => setEmailStatus('newemail')}>
-            Thay đổi email
-          </Button>
           {status === 'noactive' && (
-            <div style={{ marginTop: 16 }}>
-              <Alert
-                message="Email của bạn chưa được xác thực."
-                type="warning"
-                showIcon
-                style={{ marginBottom: 12 }}
-              />
+            <Alert
+              message="Your email is not verified."
+              type="warning"
+              showIcon
+              style={{ marginBottom: 12 }}
+            />
+          )}
+          <div className='flex justify-self-end gap-1.5'>
+            <Button type="default" onClick={() => setEmailStatus('newemail')}>
+              Change email
+            </Button>
+            {status === 'noactive' && (
               <Button
                 type="primary"
                 onClick={handleSendVerification}
                 disabled={cooldown > 0}
               >
-                {cooldown > 0 ? `Gửi lại sau ${cooldown}s` : 'Gửi mã xác nhận'}
+                {cooldown > 0 ? `Resend after ${cooldown}s` : 'Send confirmation code'}
               </Button>
-            </div>
-          )}
-        </Form>
+            )}
+          </div>
+        </>
       )}
 
       {status === 'newemail' && (
-        <Form layout="vertical">
-          <Form.Item label="Email mới">
+        <>
+          <Form.Item
+            label="New Email"
+            validateStatus={email && !/\S+@\S+\.\S+/.test(email) ? 'error' : ''}
+            help={
+              email && !/\S+@\S+\.\S+/.test(email) ? 'Invalid email' : ''
+            }
+          >
             <Input value={email} onChange={(e) => setEmail(e.target.value)} />
           </Form.Item>
-          <Form.Item label="Mật khẩu hiện tại">
-            <Input.Password value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Form.Item label="Current Password">
+            <Input.Password
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </Form.Item>
-          <Button
-            type="primary"
-            onClick={handleSendVerification}
-            disabled={cooldown > 0 || !email || !password}
-          >
-            {cooldown > 0 ? `Chờ ${cooldown}s` : 'Xác thực Email'}
-          </Button>
-          <p style={{ marginTop: 10 }}>{message}</p>
-        </Form>
+          <div className='flex justify-self-end gap-1.5'>
+            <Button
+              type='default'
+              onClick={() => setEmailStatus('noactive')}>
+              Back
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleSendVerification}
+              disabled={cooldown > 0 || !email || !password}
+            >
+              {cooldown > 0 ? `Wait for ${cooldown}s` : 'Verify new Email'}
+            </Button>
+          </div>
+        </>
       )}
-    </div>
+
+      {message && (
+        <Alert
+          message={message}
+          type="info"
+          showIcon
+          style={{ marginTop: 12 }}
+        />
+      )}
+    </Form>
   );
 };
 
@@ -310,25 +308,15 @@ const StyleEditVerifyInfo = styled.div`
 const FormItem = styled.div`
   margin-bottom: 16px;
 
-  .ant-input {
-    margin-top: 8px;
-    min-height: 48px;
-    padding: 14px 16px;
-  }
-
   label {
     font-size: 14px;
-    padding-left: 16px;
+    padding-left: 4px;
   }
 
-  /* .custom_input_username {
-    height: 50px;
-  } */
-
-  /* .custom_input_password input {
-    margin: 0;
-    min-height: 40px;
-  } */
+  .ant-input {
+    margin-top: 8px;
+    min-height: 44px;
+  }
 `;
 
 export default EditVerifyInfo;
